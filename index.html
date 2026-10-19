@@ -1,0 +1,1307 @@
+<!doctype html>
+<html lang="te">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>తెలుగు పదకేళి</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;600;700&family=Noto+Serif+Telugu:wght@700&display=swap">
+<style>
+/* Layout: board on the left, clues on the right; clues drop below the board on narrow screens.
+   Palette: slate-blue ground, teal accent, amber current cell. Type: Noto Sans Telugu body, Noto Serif Telugu title. */
+:root{
+  --bg:#EDF1F4;--surface:#FFFFFF;--ink:#14212B;--muted:#566774;--line:#AEBBC5;
+  --cell:#FFFFFF;--black:#1E2B36;--black-ink:#5A6D7C;
+  --sel-word:#B7D7F7;--sel-cell:#F7CB4A;--accent:#0E7C70;--accent-ink:#FFFFFF;
+  --bad:#B8322A;--bad-bg:#F9D9D5;--good:#1B7F4B;--warn:#A5500A;--lock-bg:#B5E6C3;--lock-ink:#0B4F2B;
+  --font:"Noto Sans Telugu","Nirmala UI","Gautami",system-ui,sans-serif;
+  --font-display:"Noto Serif Telugu","Noto Sans Telugu","Nirmala UI",serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E151B;--surface:#16212A;--ink:#E7EEF3;--muted:#92A4B2;--line:#33444F;
+  --cell:#1C2933;--black:#06090C;--black-ink:#46586A;
+  --sel-word:#24476E;--sel-cell:#8A6A0A;--accent:#38B6A5;--accent-ink:#04201C;
+  --bad:#FF8A80;--bad-bg:#4A1F1C;--good:#6FD39A;--warn:#F0A55A;--lock-bg:#1C5233;--lock-ink:#7FD9A1;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E151B;--surface:#16212A;--ink:#E7EEF3;--muted:#92A4B2;--line:#33444F;
+  --cell:#1C2933;--black:#06090C;--black-ink:#46586A;
+  --sel-word:#24476E;--sel-cell:#8A6A0A;--accent:#38B6A5;--accent-ink:#04201C;
+  --bad:#FF8A80;--bad-bg:#4A1F1C;--good:#6FD39A;--warn:#F0A55A;--lock-bg:#1C5233;--lock-ink:#7FD9A1;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
+h1{font-family:var(--font-display);font-size:clamp(24px,4vw,32px);margin:0;line-height:1.2;text-wrap:balance}
+.meta{color:var(--muted);font-size:13px}
+.main{display:grid;grid-template-columns:auto minmax(0,1fr);gap:26px;align-items:start}
+@media(max-width:860px){.main{grid-template-columns:minmax(0,1fr)}}
+.left{min-width:0;display:grid;gap:14px;justify-items:start}
+.board{--cs:clamp(29px,calc((100vw - 40px)/10.2),54px);
+  display:grid;grid-template-columns:repeat(10,var(--cs));grid-auto-rows:var(--cs);gap:1px;background:var(--line);border:1px solid var(--line);width:max-content;max-width:100%}
+.cell{position:relative;background:var(--cell);display:block;cursor:pointer}
+.cell.black{background:var(--black);display:flex;align-items:center;justify-content:center;color:var(--black-ink);font-size:calc(var(--cs)*.4)}
+.cell.inword{background:var(--sel-word)}
+.cell.cur{background:var(--sel-cell)}
+.cell.locked{background:var(--lock-bg)}
+.cell.locked input{color:var(--lock-ink);cursor:default}
+.cell.locked.cur{background:var(--sel-cell)}
+.clue.done .n::after{content:' ✓'}
+.hb-nav{float:left;margin-right:8px;font:700 18px/1 var(--font);width:32px;min-height:28px;padding:0;border-radius:6px}
+.hb-x{display:none;float:right;margin-left:6px;font:700 14px/1 var(--font);padding:5px 9px;min-height:28px;border-radius:6px}
+.kbfloat .hb-x{display:inline-block}
+.hb-tg{float:right;margin-left:8px;font:700 12px/1 var(--font);padding:5px 9px;min-height:28px;border-radius:6px}
+.hb-tg[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.hintbar .hb-ok{color:var(--good);font-weight:700;margin-left:6px}
+.cell.bad{background:var(--bad-bg)}
+.cell.bad input{color:var(--bad)}
+.cell.warnempty{box-shadow:inset 0 0 0 2px var(--warn)}
+.num{position:absolute;top:1px;left:3px;font-size:clamp(8px,calc(var(--cs)*.22),11px);color:var(--muted);pointer-events:none;line-height:1;font-weight:600}
+.cell input{width:100%;height:100%;border:0;background:transparent;color:var(--ink);text-align:center;
+  font:700 max(16px,calc(var(--cs)*.44))/1 var(--font);padding:calc(var(--cs)*.16) 0 0;outline:none;caret-color:var(--accent);cursor:pointer;border-radius:0}
+.cell input:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.cell.cur input{color:var(--ink)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;max-width:calc(var(--bw,540px))}
+.group{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.group>.lab{font-size:12px;color:var(--muted);margin-right:2px}
+button{font:600 13px/1 var(--font);padding:9px 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-height:36px}
+button:hover{border-color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.hintbar{display:none;width:100%;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;font-size:16px;line-height:1.45;position:static}
+.hintbar .hb-n{font-weight:700;color:var(--accent);margin-right:6px}
+.hintbar .hb-len{color:var(--muted);font-size:13px;white-space:nowrap}
+.hintbar .hb-en{display:block;color:var(--muted);font-size:14px;margin-top:2px}
+.onlymobile{display:none}
+@media (max-width:860px){.hintbar{display:block}.right{display:none}body.show-clues .right{display:grid}.onlymobile{display:inline-block}}
+.kb .notice,.kb .namebar,.kb header,.kb .hintline,.kb .status,.kb .right,.kb .resultbox,.kb #sugg{display:none}
+.kb body,body.kb{padding-block:6px}
+.kb .main,.kb .wrap{gap:8px}
+.kb .left{gap:6px}
+.kb .left{display:flex;flex-direction:column;align-items:stretch;gap:6px}
+.kb .board{align-self:flex-start;order:0}
+.kb .hintbar{padding:6px 10px;font-size:15px;position:static}
+.kbfloat .hintbar{position:fixed;left:8px;right:8px;width:auto;z-index:20;padding:6px 10px;font-size:15px;max-height:30vh;overflow:auto;box-shadow:0 -2px 10px rgba(0,0,0,.2);top:var(--hy,auto);bottom:var(--hb,auto)}
+.kb .pad{order:-4;position:sticky;top:0;z-index:7;background:var(--bg);padding:2px 0}
+body.kb{padding-bottom:70vh}
+.kb .typing,.kb #sugg{order:-2}
+.kb .tools{order:1}
+.kb .cell input{scroll-margin-top:150px;scroll-margin-bottom:10px}
+.kb .typing{min-height:0;font-size:14px}
+.kbfloat .typing{position:fixed;left:8px;right:8px;z-index:21;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:14px;box-shadow:0 -2px 10px rgba(0,0,0,.2);top:var(--ty,auto);bottom:var(--tb,auto)}
+.kb .pad{gap:4px}
+.kb .pad button{min-height:34px;min-width:36px;padding:4px 4px;font-size:15px}
+.kb .pad .wide{min-width:54px;font-size:12px}
+.kb .tools{display:flex}
+.kb .tools .group:nth-child(n+3),.kb #clr{display:none}
+.kb .tools button{min-height:32px;padding:6px 10px;font-size:12px}
+.status:empty,.typing:empty{display:none}
+.pad{display:none;flex-wrap:wrap;gap:6px;max-width:100%}
+.pad button{min-width:46px;min-height:44px;font-size:18px;padding:8px 10px}
+.pad .wide{min-width:84px;font-size:14px}
+@media (pointer:coarse),(max-width:860px){.pad{display:flex}}
+.typing{min-height:20px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip{font:600 13px/1 var(--font);padding:5px 9px;min-height:28px;margin:0 3px 3px 0;border-radius:6px}
+.typing b{color:var(--accent);font-weight:700}
+.status.win{background:var(--lock-bg);border:1px solid var(--lock-ink);border-radius:8px;padding:10px 12px;color:var(--lock-ink);font-size:16px}
+.status{min-height:22px;font-size:14px;font-weight:600;color:var(--good)}
+.hintline{font-size:13px;color:var(--muted);max-width:540px}
+.right{min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+@media(max-width:560px){.right{grid-template-columns:minmax(0,1fr)}}
+.clues h2{font-size:13px;letter-spacing:.04em;margin:0 0 8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);padding-bottom:6px}
+.clues ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.clue{display:grid;grid-template-columns:28px minmax(0,1fr);gap:6px;padding:6px 8px;border-radius:6px;cursor:pointer;align-items:start}
+.clue:hover{background:var(--surface)}
+.clue.active{background:var(--sel-word)}
+.clue .n{font-weight:700;color:var(--accent);text-align:right}
+.clue .t{min-width:0;overflow-wrap:anywhere}
+.clue .len{color:var(--muted);font-size:12px;white-space:nowrap}
+.clue.done .t{color:var(--muted);text-decoration:line-through;text-decoration-thickness:1px}
+.clue.nohint .t{color:var(--warn);font-style:italic}
+.clue input.h{width:100%;font:400 max(16px,14px)/1.4 var(--font);padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+.clue .en{font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.clue input.h.e2{margin-top:4px;font-size:13px}
+.clue .ans{font-size:11px;color:var(--muted)}
+.edit-panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px}
+.edit-panel[hidden]{display:none}
+.edit-panel h3{margin:0;font-size:14px}
+.edit-panel p{margin:0;font-size:13px;color:var(--muted)}
+textarea{width:100%;min-height:96px;font:max(16px,12px)/1.4 ui-monospace,Menlo,monospace;background:var(--cell);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px}
+.warns{margin:0;padding-left:18px;font-size:13px;color:var(--warn)}
+.warns:empty{display:none}
+.playerline{font-size:16px;font-weight:600}
+.playerline b{color:var(--accent);font-weight:700}
+.kb .playerline{display:none}
+.notice .short{display:none}
+@media (max-width:860px){.notice .long{display:none}.notice .short{display:block}}
+.namebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.namebar label{font-weight:600;font-size:14px}
+.namebar input{font:400 max(16px,14px)/1.3 var(--font);padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:0;flex:1 1 150px;max-width:300px}
+.resultbox{display:grid;gap:6px;max-width:540px}
+.resultbox[hidden]{display:none}
+.notice{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;font-size:13px;display:grid;gap:2px}
+.notice strong{font-weight:700}
+.track{font-size:12px;color:var(--muted)}
+.track.on{color:var(--good)}
+.track.off{color:var(--warn)}
+.report{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px}
+.report[hidden]{display:none}
+.report h3{margin:0;font-size:15px}
+.sum{display:flex;flex-wrap:wrap;gap:10px}
+.sum div{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:120px}
+.sum b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.sum span{font-size:12px;color:var(--muted)}
+.tscroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:600}
+.hard{margin:0;padding-left:18px;font-size:13px}
+
+.winov{position:fixed;inset:0;z-index:50;background:rgba(10,20,28,.62);display:flex;align-items:center;justify-content:center;padding:16px}
+.winbox{background:var(--surface);color:var(--ink);border:2px solid var(--lock-ink);border-radius:16px;padding:22px 20px;max-width:380px;width:100%;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.winbox .big{font-size:44px;line-height:1.1}
+.winbox h2{margin:8px 0 4px;font:700 24px/1.3 var(--font);color:var(--lock-ink)}
+.winbox p{margin:4px 0;font-size:17px;line-height:1.5}
+.winbox .tm{font:700 28px/1.25 var(--font);color:var(--accent);margin:10px 0 2px;font-variant-numeric:tabular-nums}
+.winbox .row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+</style>
+<style>:root{color-scheme:light}html,body{margin:0}body{font-family:system-ui,sans-serif}</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1 id="title">తెలుగు పదకేళి</h1>
+    <div class="meta" id="meta"></div>
+    <div id="doneBanner" hidden style="margin:8px 0;padding:10px 12px;border-radius:8px;background:#DDF2E3;color:#14212B;font-weight:600">ఈ రోజు పజిల్ పూర్తి చేశారు. కొత్తది త్వరలో వస్తుంది.<br><small style="font-weight:400">You've finished today's puzzle. A new one is coming soon.</small></div>
+  </header>
+
+  <div class="notice" id="notice">
+    <div class="short"><strong>గమనిక:</strong> మీ పేరు, సమయం, సరైన గడులు, సహాయం నమోదవుతాయి.</div>
+    <div class="long"><strong>గమనిక:</strong> ఈ పజిల్‌లో మీ ప్రోగ్రెస్ నమోదవుతుంది: మీరు రాసే పేరు, ఎంత సమయం గడిపారు, ఎన్ని గడులు నింపారు, ఎన్ని సరైనవి, ఎంత సహాయం (అక్షరం/పదం/అన్నీ చూపు) వాడారు, పూర్తి చేశారా అన్నవి. ఇవి పజిల్ నిర్వాహకులకు మాత్రమే కనిపిస్తాయి.</div>
+    <div class="track" id="track">ప్రోగ్రెస్ నమోదు: తనిఖీ చేస్తోంది…</div>
+  </div>
+  <div class="namebar" id="namebar">
+    <label for="nameIn">మీ పేరు</label>
+    <input id="nameIn" type="text" maxlength="40" placeholder="ఉదా. లక్ష్మి" autocomplete="name">
+    <button id="nameOk" type="button" class="primary">ఇవ్వు</button>
+    <span class="meta" id="nameMsg"></span>
+  </div>
+  <div class="playerline" id="playerLine" hidden></div>
+
+  <div class="main">
+    <div class="left">
+      <div class="board" id="board" role="grid" aria-label="పదకేళి గడులు"></div>
+      <div class="hintbar" id="hintbar" aria-live="polite"></div>
+      <div class="status" id="status" role="status"></div>
+      <div class="typing" id="typing" aria-live="polite"></div>
+      <div class="typing" id="sugg" aria-live="polite"></div>
+      <div class="pad" id="pad" aria-label="కర్సర్ బటన్లు">
+        <button type="button" data-k="L" aria-label="ఎడమ">◀</button>
+        <button type="button" data-k="R" aria-label="కుడి">▶</button>
+        <button type="button" data-k="U" aria-label="పైకి">▲</button>
+        <button type="button" data-k="D" aria-label="కిందికి">▼</button>
+        <button type="button" data-k="B" aria-label="వెనక్కి తొలగించు">⌫</button>
+        <button type="button" data-k="S" class="wide">తర్వాత</button>
+        <button type="button" data-k="E" class="wide">కింద</button>
+      </div>
+      <div class="tools" id="tools">
+        <div class="group"><span class="lab">చూపు</span>
+          <button id="rvCell" type="button">అక్షరం</button>
+          <button id="rvWord" type="button">పదం</button>
+        </div>
+        <div class="group">
+          <button id="chk" type="button" aria-pressed="false">తనిఖీ</button>
+          <button id="liveBtn" type="button" aria-pressed="false">తప్పులు</button>
+          <button id="clr" type="button">తుడిచేయి</button>
+        </div>
+        <div class="group">
+          <button id="editBtn" type="button" aria-pressed="false">సవరణ మోడ్</button>
+          <button id="ttBtn" type="button" aria-pressed="true">ఇంగ్లీష్→తెలుగు: ఆన్</button>
+          <button id="enBtn" type="button" aria-pressed="false">English hints: Off</button>
+          <button id="clBtn" type="button" class="onlymobile" aria-pressed="false">అన్ని సూచనలు</button>
+          <button id="shareBtn" type="button">ఫలితం కాపీ చేయి</button>
+        </div>
+      </div>
+      <div class="resultbox" id="resultBox" hidden><textarea id="resultText" readonly aria-label="ఫలితం"></textarea><span class="meta">పై టెక్స్ట్ కాపీ చేసి నిర్వాహకులకు పంపండి.</span></div>
+      <div class="hintline" id="hintline">ఇంగ్లీష్ అక్షరాలతో టైప్ చేయవచ్చు: naa → నా, amaraavati → అమరావతి (కీబోర్డ్ మార్చాల్సిన పనిలేదు; మీ సొంత తెలుగు కీబోర్డ్ వాడాలంటే బటన్‌తో ఆఫ్ చేయండి). M = ం, H = ః, T N L S = ట ణ ళ ష (ఫోన్‌లో మొదటి అక్షరం ఆటోమేటిక్‌గా క్యాపిటల్ అయితే దాన్ని చిన్న అక్షరంగానే తీసుకుంటాను; ట/ణ/ళ/ష కోసం ఇతర రూపాల చిప్స్ వాడండి); d = డ, dh = ద, dhh = ధ. అచ్చులు: a i u e o = అ ఇ ఉ ఎ ఒ; అక్షరాన్ని రెండుసార్లు రాస్తే దీర్ఘం: aa ii uu ee oo = ఆ ఈ ఊ ఏ ఓ. ద/డ లాంటి జతల్లో రాసేటప్పుడు కింద చూపే ఇతర రూపాల్లో ఒకదాన్ని నంబర్ కీ (1, 2…) తో లేదా నొక్కి ఎంచుకోవచ్చు. ఒక గడిలో ఒక అక్షరమే; ఎంచుకున్న పదంలో (అడ్డం లేదా నిలువు) అక్షరం పూర్తయ్యాక కర్సర్ ఆటోమేటిక్‌గా తర్వాతి గడికి వెళ్తుంది. Space నొక్కితే కుడివైపు గడికి (లేదా తర్వాతి అడ్డం పదానికి), Enter నొక్కితే కింది గడికి వెళ్తుంది. పదాన్ని ఒకేసారి టైప్ చేయవచ్చు, అడ్డంగా అయినా నిలువుగా అయినా: ఎంచుకున్న సూచన దిశలో గడులన్నీ వరుసగా నిండుతాయి. మీరు టైప్ చేసినది ఆ గడిలోని సరైన అక్షరానికి సరిపోతే (ణ/న, ర/రా, డ/ద లాంటివి) సరైన అక్షరమే పడుతుంది.</div>
+    </div>
+
+    <div class="right">
+      <section class="clues"><h2>అడ్డం</h2><ol id="clA"></ol></section>
+      <section class="clues"><h2>నిలువు</h2><ol id="clD"></ol></section>
+    </div>
+  </div>
+
+  <section class="edit-panel" id="editPanel" hidden>
+    <h3>సవరణ మోడ్</h3>
+    <p>గడిని ఎంచుకుని సమాధాన అక్షరం టైప్ చేయండి. నల్ల గడి (❖) కావాలంటే "నల్ల గడి మార్చు" నొక్కండి లేదా # టైప్ చేయండి. కుడివైపు సూచనల పెట్టెల్లో సూచనలు మార్చండి. సంఖ్యలు ఆటోమేటిక్‌గా మారతాయి.</p>
+    <div class="group">
+      <button id="toggleBlack" type="button">నల్ల గడి మార్చు</button>
+      <button id="copyJson" type="button" class="primary">JSON కాపీ చేయి</button>
+      <button id="resetBtn" type="button">మొదటి పజిల్ తెచ్చుకో</button>
+    </div>
+    <ul class="warns" id="warns"></ul>
+    <p>మరో పజిల్ లోడ్ చేయడానికి JSON ఇక్కడ అతికించండి:</p>
+    <textarea id="importBox" placeholder='{"grid":[...],"hints":{...}}'></textarea>
+    <div class="group"><button id="importBtn" type="button">లోడ్ చేయి</button><span class="meta" id="editMsg"></span></div>
+  </section>
+</div>
+
+<script>
+/* Publish panel: open this page with ?publish=1, paste the puzzle JSON from Padakeli Studio, enter the key, press Publish. */
+(function () {
+  if (!/[?&]publish/.test(location.search)) return;
+  var d = document.createElement('div');
+  d.style.cssText = 'max-width:760px;margin:12px auto;padding:12px 14px;border:2px solid #0E7C70;border-radius:10px;background:#fff;color:#14212B;font:15px/1.5 system-ui,sans-serif';
+  d.innerHTML = '<b>Publish a puzzle to players</b> <small>(a puzzle copied with Save instead of Publish is stored as a draft and not shown to players)</small><br><textarea id="pubJson" rows="5" placeholder="Paste the puzzle JSON from Padakeli Studio" style="width:100%;box-sizing:border-box;font:13px monospace"></textarea>' +
+    '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap"><input id="pubKey" type="password" autocomplete="off" placeholder="Publish key" style="flex:1;min-width:160px;font:16px system-ui;padding:6px"><button id="pubGo" style="font:600 15px system-ui;padding:6px 14px">Publish</button></div><div id="pubMsg" role="status" style="margin-top:6px"></div>';
+  document.body.insertBefore(d, document.body.firstChild);
+  var msg = function (t) { document.getElementById('pubMsg').textContent = t; };
+  try { document.getElementById('pubKey').value = localStorage.getItem('tp-pubkey') || ''; } catch (e) {}
+  document.getElementById('pubGo').onclick = async function () {
+    var p, key = document.getElementById('pubKey').value.trim();
+    try { p = JSON.parse(document.getElementById('pubJson').value); } catch (e) { msg('That is not valid JSON.'); return; }
+    if (!p || !Array.isArray(p.grid) || p.grid.length !== 10 || !p.hints || !/^[0-9A-Za-z_-]{1,20}$/.test(p.date || '')) { msg('This does not look like a puzzle (needs a date, a 10-row grid and hints).'); return; }
+    if (!key) { msg('Enter the publish key.'); return; }
+    try { localStorage.setItem('tp-pubkey', key); } catch (e) {}
+    msg('Publishing…');
+    try {
+      await fetch(PUZZLE_ENDPOINT, {method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({action: 'puzzle', key: key, puzzle: p})});
+      await new Promise(function (r) { setTimeout(r, 1500); });
+      var back = await fetch(PUZZLE_ENDPOINT + '?puzzle=' + encodeURIComponent(p.date) + '&any=1&t=' + Date.now()).then(function (r) { return r.json(); });
+      if (back && back.ok && JSON.stringify(back.puzzle.grid) === JSON.stringify(p.grid) && JSON.stringify(back.puzzle.hints) === JSON.stringify(p.hints)) msg(p.status === 'saved' ? 'Saved as a draft for ' + p.date + '. Players do not see it yet.' : 'Published. Players get puzzle ' + p.date + ' the next time they open the page.');
+      else if (back && back.ok === false && back.error === 'none' || back && back.error === 'not found') msg('Sent, but it did not show up on the server. The key is probably wrong, or that date is already live.');
+      else msg('Sent, but it did not show up on the server. The key is probably wrong.');
+    } catch (e) { msg('Could not reach the server: ' + e); }
+  };
+})();
+</script>
+<script>
+/* Latest published puzzle: asks the Apps Script for it, falls back to the last one seen on this device, then to the built-in puzzle. */
+var PUZZLE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwjcBJak_kJiEFuPh8qVRDLxpUhJYktkghnAAw5DPauljQ__I4sRqCNSmY6eBxdP0Hoxg/exec';   // paste your Google Apps Script web-app URL here; leave empty to disable
+(function () {
+  function start() {
+    var el = document.getElementById('main-src'), sc = document.createElement('script');
+    sc.textContent = el.textContent; document.body.appendChild(sc);
+  }
+  function ok(p) { return p && Array.isArray(p.grid) && p.grid.length === 10 && p.grid.every(function (r) { return typeof r === 'string' && r.split(' ').length === 10; }) && p.hints && typeof p.hints === 'object'; }
+  function use(p) { p = JSON.parse(JSON.stringify(p)); p.grid = p.grid.map(function (r) { return r.split(' '); }); window.__PUZ = p; }
+  var cached = null; try { cached = JSON.parse(localStorage.getItem('tp-latest') || 'null'); } catch (e) {}
+  var done = false;
+  function go(p) { if (done) return; done = true; if (p && ok(p)) use(p); start(); }
+  if (!PUZZLE_ENDPOINT || !window.fetch) { go(null); return; }
+  var t = setTimeout(function () { go(cached); }, 4000);
+  fetch(PUZZLE_ENDPOINT + '?puzzle=latest', {cache: 'no-store'}).then(function (r) { return r.json(); }).then(function (j) {
+    clearTimeout(t);
+    if (j && j.ok && ok(j.puzzle)) { try { localStorage.setItem('tp-latest', JSON.stringify(j.puzzle)); } catch (e) {} go(j.puzzle); }
+    else if (j && j.ok === false && j.error === 'none' && !/[?&]publish/.test(location.search)) { done = true; document.body.insertAdjacentHTML('beforeend', '<div style="max-width:520px;margin:20vh auto;padding:0 16px;text-align:center;font:600 22px/1.5 system-ui,sans-serif">మొదటి పజిల్ త్వరలో వస్తుంది<br><small style="font-weight:400;font-size:15px">First puzzle coming soon</small></div>'); }
+    else go(cached);
+  }).catch(function () { clearTimeout(t); go(cached); });
+})();
+</script>
+<script type="text/plain" id="main-src">
+window.addEventListener('error', e => { const t = document.getElementById('track'); if (t) t.textContent = 'లోపం: ' + e.message + ' @' + e.lineno; });
+const N = 10, BLACK = '#';
+const ORIGINAL = {
+  title: 'తెలుగు పదకేళి #1', date: '2026-10-17',
+  grid: [
+    'అ మ రా వ తి కి # నా లు క', 'డ # క ర్ణ # # వె న్న # వి', 'వి త్తు # మా # ఇ ల్లు # తా త',
+    '# # బ ల పం # ల్లి # మ #', 'గు మ్మ డి # డు # # వ ర ద', 'లా # త # గ డి యా రం # #',
+    'బీ ర # # లు # # గ రు డ', '# చ లి లో # ఏ ప్రి ల్ # జ', '# యి # తు ఫా ను # # కా ను',
+    'పో త న # # గు రు వా రం #'].map(r => r.split(' ')),
+  hints: {
+    'అమరావతికి':'ఆంధ్రప్రదేశ్ రాజధానికి','నాలుక':'రుచి చూసే అవయవం','కర్ణ':'దానవీరశూర.......','వెన్న':'పెరుగు చిలికితే వచ్చేది',
+    'విత్తు':'మొలకెత్తి మొక్కగా మారేది','ఇల్లు':'మనం నివసించే చోటు','తాత':'నాన్నకు నాన్న','బలపం':'పలకపై రాయడానికి వాడేది',
+    'గుమ్మడి':'పెద్దగా ఉండే పసుపు కూరగాయ','వరద':'నది పొంగి ఊళ్లను ముంచెత్తడం','గడియారం':'సమయం చెప్పే పరికరం',
+    'బీర':'నాజూకైన పొడవాటి కూరగాయ','గరుడ':'ఒక పక్షి వాహనం','చలిలో':'చల్లటి వాతావరణంలో','ఏప్రిల్':'వేసవి మొదలయ్యే నెల',
+    'తుఫాను':'పెనుగాలులతో కూడిన భారీ వాన','కాను':'అవ్వను','పోతన':'భాగవతాన్ని తెలుగులో రాసిన కవి','గురువారం':'బృహస్పతికి చెందిన రోజు',
+    'అడవి':'పులులు, ఏనుగులు తిరిగే చెట్ల సమూహం','రాక':'ఆగమనం','వర్ణమాల':'అచ్చులు, హల్లుల వరుస','నాన్న':'తండ్రికి ముద్దుపేరు',
+    'కవిత':'భావాన్ని లయబద్ధంగా చెప్పే రచన','వెల్లుల్లి':'ఘాటైన వాసన గల పాయలు','తామర':'మన జాతీయ పుష్పం','బడిత':'ఈ పూజని ఎవరూ కోరుకోరు.',
+    'పండుగలు':'ఆనందంగా జరుపుకునేవి','గులాబీ':'ముళ్లున్న ఎర్రని పువ్వు','వరంగల్':'కాకతీయుల రాజధాని, వేయి స్తంభాల గుడి ఉన్న నగరం',
+    'రచయిత':'పుస్తకాలు రాసేవారు','డజను':'పన్నెండు','లోతు':'పైనుంచి అడుగు వరకు ఉన్న దూరం','ఏనుగు':'తొండం ఉన్న అతి పెద్ద భూచర జంతువు','కారం':'తీపి కాదు'
+  }
+};
+ORIGINAL.hintsEn = {"అమరావతికి": "To the capital of Andhra Pradesh", "నాలుక": "The organ that tastes", "కర్ణ": "Complete the famous line \"Dānavīra-śūra…\"", "వెన్న": "What you get when curd is churned", "విత్తు": "What sprouts and grows into a plant", "ఇల్లు": "The place where we live", "తాత": "Dad's dad", "బలపం": "What is used to write on a slate", "గుమ్మడి": "A large yellow vegetable", "వరద": "A river rising and flooding the villages", "గడియారం": "A device that tells the time", "బీర": "A slender, long vegetable", "గరుడ": "A bird that serves as a vehicle", "చలిలో": "In cold weather", "ఏప్రిల్": "The month when summer begins", "తుఫాను": "Heavy rain with strong winds", "కాను": "\"I will not become\"", "పోతన": "The poet who wrote the Bhagavatam in Telugu", "గురువారం": "The day that belongs to Brihaspati (Jupiter)", "అడవి": "A mass of trees where tigers and elephants roam", "రాక": "Arrival", "వర్ణమాల": "The sequence of vowels and consonants", "నాన్న": "A pet name for father", "కవిత": "A piece of writing that expresses a feeling in rhythm", "వెల్లుల్లి": "Cloves with a pungent smell", "తామర": "Our national flower", "బడిత": "No one wants this worship.", "పండుగలు": "Things (plural) celebrated with joy", "గులాబీ": "A red flower with thorns", "వరంగల్": "The city that was the Kakatiyas’ capital and has the thousand-pillar temple", "రచయిత": "Those who write books", "డజను": "Twelve", "లోతు": "The distance from the top down to the bottom", "ఏనుగు": "The largest land animal, with a trunk", "కారం": "Not sweet"};
+const WORDBANK = ["నది", "చెట్టు", "పర్వతం", "సముద్రం", "ఆకాశం", "చంద్రుడు", "సూర్యుడు", "వర్షం", "పుస్తకం", "పాఠశాల", "ఉపాధ్యాయుడు", "గణితం", "భూమి", "గ్రహం", "నక్షత్రం", "తెలంగాణ", "అమరావతి", "హైదరాబాద్", "భారతదేశం", "రూపాయి", "క్రికెట్", "కబడ్డీ", "చదరంగం", "మామిడి", "అరటి", "కొబ్బరి", "బియ్యం", "నెమలి", "పులి", "ఏనుగు", "సింహం", "తామర", "జెండా", "పార్లమెంటు", "రాజ్యాంగం", "ఎన్నికలు", "ప్రధాని", "న్యాయం", "ఇస్రో", "చంద్రయాన్", "కంప్యూటర్", "ఇంటర్నెట్", "విద్యుత్తు", "వైద్యుడు", "ఆరోగ్యం", "తెలుగు", "అక్షరం", "కవిత", "కూచిపూడి", "బతుకమ్మ", "ఉగాది", "సంక్రాంతి", "దసరా", "దీపావళి", "గంగ", "కృష్ణ", "గోదావరి", "తాజ్మహల్", "చార్మినార్", "ఒలింపిక్స్", "పతకం", "రైలు", "విమానం", "పాలు", "నీరు", "గాలి", "మేఘం", "ఇంద్రధనస్సు", "యోగా", "వ్యాయామం", "శాస్త్రవేత్త", "గ్రంథాలయం", "రైతు", "పంట", "అడవి", "రామాయణం", "మహాభారతం", "వేమన", "పోతన", "తిక్కన", "గాంధీ", "నెహ్రూ", "అంబేద్కర్", "కలాం", "విజయవాడ", "విశాఖపట్నం", "తిరుపతి", "వరంగల్", "ఢిల్లీ", "ముంబై", "హిమాలయాలు", "ఎవరెస్టు", "ఎడారి", "ద్వీపం", "సరస్సు", "జలపాతం", "భూకంపం", "తుఫాను", "వాతావరణం", "పర్యావరణం", "కాలుష్యం", "సౌరశక్తి", "బ్యాటరీ", "మొబైల్", "రోబో", "ఉపగ్రహం", "రాకెట్", "అంతరిక్షం", "వ్యోమగామి", "దేవాలయం", "పండుగ", "ముగ్గు", "గాలిపటం", "గోరింటాకు", "ఇడ్లీ", "దోసె", "పులిహోర", "గారెలు", "ఆవకాయ", "టమాటా", "వంకాయ", "బంతి", "వికెట్", "ఓటు", "బడ్జెట్", "పన్ను", "బ్యాంకు", "సంగీతం", "చిత్రం", "నాటకం", "కథ", "పద్యం", "వ్యాకరణం", "నిఘంటువు", "వర్ణమాల", "బడిలో", "లోకం", "లోయ", "లోహం", "లోతు", "లోపం", "లోగిలి", "గామి", "యామి", "ఈగ", "బాహుబలి", "పుష్ప", "మగధీర", "మహానటి", "అరుంధతి", "మాయాబజార్", "కల", "కళ", "అల", "ఇల", "అమ్మ", "నాన్న", "తాత", "అక్క", "చెల్లి", "అన్న", "మామ", "రాజు", "రాణి", "కోట", "గుడి", "వల", "పలక", "బలపం", "కలం", "చెరువు", "బావి", "పొలం", "తోట", "పువ్వు", "ఆకు", "వేరు", "విత్తు", "నేల", "మబ్బు", "మెరుపు", "ఉరుము", "నవ్వు", "కోపం", "ప్రేమ", "స్నేహం", "గురువు", "చదువు", "లెక్క", "బొమ్మ", "పాట", "ఆట", "మాట", "ఊరు", "నగరం", "గ్రామం", "దేశం", "రాష్ట్రం", "వారం", "మాసం", "సమయం", "గడియారం", "ఇల్లు", "తలుపు", "కిటికీ", "దీపం", "చందమామ", "సాయం", "విజయం", "కృషి", "జ్ఞానం", "నిప్పు", "మంట", "పొగ", "బూడిద", "ఇసుక", "మట్టి", "రాయి", "కొండ", "గుహ", "ఎండ", "వెన్నెల", "చీకటి", "వెలుగు", "ఉదయం", "సాయంత్రం", "రాత్రి", "పగలు", "చలి", "వేడి", "మంచు", "వరద", "కాలువ", "వాగు", "తీరం", "పడవ", "ఓడ", "వంతెన", "రోడ్డు", "దారి", "వీధి", "మలుపు", "ఆవు", "గేదె", "మేక", "గొర్రె", "కుక్క", "పిల్లి", "ఎలుక", "కోడి", "బాతు", "చిలుక", "కాకి", "గద్ద", "పావురం", "హంస", "కొంగ", "చేప", "తాబేలు", "కప్ప", "పాము", "తేలు", "చీమ", "దోమ", "తేనెటీగ", "జింక", "కుందేలు", "నక్క", "గుర్రం", "ఒంటె", "గాడిద", "ఎద్దు", "కన్ను", "ముక్కు", "చెవి", "నోరు", "నాలుక", "చేయి", "కాలు", "వేలు", "గుండె", "కడుపు", "ఎముక", "జుట్టు", "మెడ", "భుజం", "అన్నం", "కూర", "పప్పు", "పచ్చడి", "చారు", "పెరుగు", "వెన్న", "నెయ్యి", "ఉప్పు", "కారం", "చక్కెర", "బెల్లం", "తేనె", "నూనె", "పిండి", "రొట్టె", "లడ్డు", "జిలేబీ", "పాయసం", "కుండ", "చెంబు", "గిన్నె", "గరిటె", "చాప", "దిండు", "మంచం", "కుర్చీ", "బల్ల", "చీపురు", "గొడుగు", "చెప్పులు", "చొక్కా", "చీర", "టోపీ", "కండువా", "ఉంగరం", "గాజులు", "బొట్టు", "తాళం", "అద్దం", "దువ్వెన", "సబ్బు", "జామ", "దానిమ్మ", "ద్రాక్ష", "బొప్పాయి", "పనస", "నిమ్మ", "ఉల్లి", "వెల్లుల్లి", "బంగాళాదుంప", "బెండ", "దొండ", "గుమ్మడి", "కాకర", "బీర", "మిరప", "అల్లం", "కొత్తిమీర", "పుదీనా", "నర్సు", "పోలీసు", "సైనికుడు", "న్యాయవాది", "కవి", "రచయిత", "గాయకుడు", "నటుడు", "చిత్రకారుడు", "శిల్పి", "కుమ్మరి", "కమ్మరి", "వడ్రంగి", "వ్యాపారి", "ఆశ", "భయం", "ధైర్యం", "శాంతి", "సత్యం", "ధర్మం", "ధనం", "సుఖం", "బలం", "భక్తి", "నమ్మకం", "కీర్తి", "గౌరవం", "అదృష్టం", "ఆనందం", "కోరిక", "ఆలోచన", "ప్రశ్న", "జవాబు", "పరీక్ష", "ఫలితం", "తరగతి", "పాఠం", "కెమెరా", "రేడియో", "డ్రోన్", "ఆధార్", "డిజిటల్", "సోమవారం", "గురువారం", "శనివారం", "జనవరి", "మార్చి", "ఏప్రిల్", "ఎరుపు", "పసుపు", "నీలం", "తెలుపు", "నలుపు", "గులాబీ", "ఒకటి", "రెండు", "మూడు", "నాలుగు", "ఐదు", "ఆరు", "ఏడు", "పది", "వంద", "వేయి", "లక్ష", "కోటి", "కర్ణ", "గరుడ", "చలిలో", "కాను", "బడిత", "పండుగలు", "అమరావతికి", "డజను"];
+const BASE = window.__PUZ || ORIGINAL;
+const SIG = JSON.stringify([BASE.grid, BASE.hints]);
+const KEY = BASE.date === ORIGINAL.date ? 'telugu-padakeli-v1' : 'telugu-padakeli-v1:' + BASE.date;   // progress is kept per puzzle date
+const $ = id => document.getElementById(id);
+const clone = o => JSON.parse(JSON.stringify(o));
+const clean = s => (s || '').normalize('NFC').replace(/[‌‍\s]/g, '');
+
+let puzzle = clone(window.__PUZ || ORIGINAL);
+let entries = Array.from({length: N}, () => Array(N).fill(''));
+let mode = 'solve', checkOn = false, liveOn = false, sel = {r: 0, c: 0, dir: 'A'};
+let W = [], cellWords = {};   // words, and "r,c" -> {A: word, D: word}
+let blackConfirm = false;
+let showEn = false; try { showEn = localStorage.getItem('tp-en') === '1'; } catch (e) {}
+
+try {
+  const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (s && s.puzzle && s.puzzle.grid && s.puzzle.grid.length === N && (!s.sig || s.sig === SIG)) { puzzle = s.puzzle; if (s.entries) entries = s.entries; }
+} catch (e) {}
+puzzle.hintsEn = Object.assign({}, BASE.hintsEn || {}, puzzle.hintsEn || {});
+function save() { let stx = null; try { stx = st; } catch (e) {} try { localStorage.setItem(KEY, JSON.stringify({puzzle, entries, stats: stx, sig: SIG})); } catch (e) {} }
+
+function analyze() {
+  const g = puzzle.grid; W = []; cellWords = {};
+  const wh = (r, c) => g[r][c] !== BLACK;
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    if (!wh(r, c)) continue;
+    const startA = (c === 0 || !wh(r, c - 1)) && c + 1 < N && wh(r, c + 1);
+    const startD = (r === 0 || !wh(r - 1, c)) && r + 1 < N && wh(r + 1, c);
+    for (const [dir, ok] of [['A', startA], ['D', startD]]) {
+      if (!ok) continue;
+      const cells = []; let rr = r, cc = c;
+      while (rr < N && cc < N && wh(rr, cc)) { cells.push([rr, cc]); if (dir === 'A') cc++; else rr++; }
+      W.push({dir, r, c, cells, text: cells.map(([a, b]) => g[a][b]).join('')});
+    }
+  }
+  let n = 0, last = '';
+  for (const w of W) {
+    const k = w.r + ',' + w.c;
+    if (k !== last) { n++; last = k; }
+    w.num = n;
+    for (const [a, b] of w.cells) { const kk = a + ',' + b; (cellWords[kk] = cellWords[kk] || {})[w.dir] = w; }
+  }
+}
+const wordAt = (r, c, dir) => (cellWords[r + ',' + c] || {})[dir] || null;
+const numAt = (r, c) => { const x = W.find(w => w.r === r && w.c === c); return x ? x.num : ''; };
+const curWord = () => wordAt(sel.r, sel.c, sel.dir);
+const ans = (r, c) => puzzle.grid[r][c];
+const wordDone = w => w.cells.every(([r, c]) => clean(entries[r][c]) === clean(ans(r, c)) && ans(r, c));
+
+function buildBoard() {
+  const b = $('board'); b.textContent = '';
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const d = document.createElement('div'); d.className = 'cell'; d.dataset.r = r; d.dataset.c = c; d.setAttribute('role', 'gridcell');
+    if (ans(r, c) === BLACK) { d.classList.add('black'); d.textContent = '❖'; d.setAttribute('aria-label', 'నల్ల గడి'); }
+    else {
+      const n = numAt(r, c);
+      if (n) { const s = document.createElement('span'); s.className = 'num'; s.textContent = n; d.appendChild(s); }
+      const i = document.createElement('input'); i.type = 'text'; i.autocomplete = 'off'; i.spellcheck = false; i.autocapitalize = 'off'; i.setAttribute('autocorrect', 'off'); i.enterKeyHint = 'next'; i.id = 'in' + r + '_' + c;
+      i.setAttribute('aria-label', 'వరుస ' + (r + 1) + ' నిలువు ' + (c + 1));
+      i.value = mode === 'edit' ? ans(r, c) : entries[r][c];
+      i.addEventListener('input', onInput); i.addEventListener('compositionend', onInput); i.addEventListener('compositionstart', onCompStart); i.addEventListener('keydown', onKey); i.addEventListener('contextmenu', ev => ev.preventDefault()); i.addEventListener('blur', () => { if (raw) commitRaw(true); });
+      d.appendChild(i);
+    }
+    d.addEventListener('click', onCellClick);
+    b.appendChild(d);
+  }
+  $('board').style.setProperty('--bw', 'auto');
+}
+function cellEl(r, c) { return $('board').children[r * N + c]; }
+
+let lockSet = new Set(), doneWords = new Set(), jumped = false, autoTimer = 0;
+const isLocked = (r, c) => lockSet.has(r + ',' + c);
+let winArmed = false, winShown = false;   // the congratulation screen shows when a puzzle goes from unfinished to finished, never for one that was already finished on load
+function paint() {
+  lockSet = new Set();
+  if (mode === 'solve') W.forEach(w => { if (wordDone(w)) w.cells.forEach(([r, c]) => lockSet.add(r + ',' + c)); });
+  const cw = curWord(); const inw = new Set(cw ? cw.cells.map(x => x.join(',')) : []);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const el = cellEl(r, c); const k = r + ',' + c;
+    el.classList.toggle('inword', inw.has(k) && !(r === sel.r && c === sel.c));
+    el.classList.toggle('cur', r === sel.r && c === sel.c);
+    const lk = lockSet.has(k); el.classList.toggle('locked', lk);
+    const a = ans(r, c);
+    const wrong = mode === 'solve' && (checkOn || liveOn) && a !== BLACK && clean(entries[r][c]) && clean(entries[r][c]) !== clean(a);
+    el.classList.toggle('bad', !!wrong);
+    el.classList.toggle('warnempty', mode === 'edit' && a === '');
+  }
+  document.querySelectorAll('.clue').forEach(li => {
+    const w = W[+li.dataset.i];
+    li.classList.toggle('active', w === cw);
+    li.classList.toggle('done', mode === 'solve' && wordDone(w));
+  });
+  updateHintBar(cw); updateSugg(cw); showCellAlts();
+  const all = W.length && W.every(wordDone);
+  if (mode === 'solve') trackProgress(all);
+  const win = mode === 'solve' && !!all;
+  $('status').textContent = win ? 'అభినందనలు! పదకేళి పూర్తయింది. సమయం ' + fmtMin(st.activeSec) + ', సహాయం ' + (st.revealCell + st.revealWord + st.revealAll) + ' సార్లు.' : '';
+  $('status').classList.toggle('win', win);
+  if (!win) winArmed = true; else if (winArmed && !winShown) { winShown = true; setTimeout(showWin, 700); }
+  if (!win) winShown = false;
+}
+
+
+
+/* ---------- spelling help: offer a known word that differs only in vowel length ---------- */
+const LONG = {'ా': '', 'ీ': 'ి', 'ూ': 'ు', 'ే': 'ె', 'ో': 'ొ', 'ఆ': 'అ', 'ఈ': 'ఇ', 'ఊ': 'ఉ', 'ఏ': 'ఎ', 'ఓ': 'ఒ'};
+const normAk = a => a.replace(/[ాీూేోఆఈఊఏఓ]/g, ch => LONG[ch]);
+function updateSugg(cw) {
+  const box = $('sugg'); box.textContent = '';
+  if (!cw) return;
+  const typed = cw.cells.map(([r, c]) => clean(mode === 'edit' ? puzzle.grid[r][c] : entries[r][c]));
+  if (typed.some(x => !x)) return;
+  const key = typed.map(normAk).join('|'), cur = typed.join('');
+  const pool = new Set(WORDBANK); W.forEach(w => { if (w.cells.every(([r, c]) => puzzle.grid[r][c])) pool.add(w.text); });
+  const out = [];
+  pool.forEach(w => { const a = aksharas(w); if (a.length === typed.length && w !== cur && a.map(normAk).join('|') === key && out.length < 3) out.push(a); });
+  if (!out.length) return;
+  box.append('ఇలా రాయాలా? ');
+  out.forEach(a => {
+    const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip'; chip.textContent = a.join('');
+    chip.addEventListener('mousedown', ev => ev.preventDefault());
+    chip.addEventListener('click', () => { cw.cells.forEach(([r, c], i) => setVal(r, c, a[i])); commit(); });
+    box.appendChild(chip);
+  });
+}
+function updateHintBar0(cw) {
+  const hb = $('hintbar'); hb.textContent = '';
+  if (mode === 'edit' || !cw) { hb.textContent = mode === 'edit' ? 'సవరణ మోడ్: కుడివైపు/కింది సూచనల పెట్టెల్లో సూచనలు మార్చండి' : ''; return; }
+  const n = document.createElement('span'); n.className = 'hb-n'; n.textContent = cw.num + (cw.dir === 'A' ? ' అడ్డం' : ' నిలువు');
+  const hint = puzzle.hints[cw.text] || 'సూచన లేదు';
+  const t = document.createElement('span'); t.textContent = hint;
+  const l = document.createElement('span'); l.className = 'hb-len'; l.textContent = ' (' + cw.cells.length + ')';
+  const tg = document.createElement('button'); tg.type = 'button'; tg.className = 'hb-tg'; tg.textContent = 'EN'; tg.setAttribute('aria-pressed', String(showEn)); tg.setAttribute('aria-label', 'English hints');
+  tg.addEventListener('pointerdown', ev => ev.preventDefault());   // keep the cell focused so the keyboard stays open
+  tg.addEventListener('click', () => $('enBtn').click());
+  const mk = (txt, back, lab) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'hb-nav'; b.textContent = txt; b.setAttribute('aria-label', lab);
+    b.addEventListener('pointerdown', ev => ev.preventDefault()); b.addEventListener('click', () => nextWord(back)); return b; };
+  const xb = document.createElement('button'); xb.type = 'button'; xb.className = 'hb-x'; xb.textContent = '⌄'; xb.setAttribute('aria-label', 'కీబోర్డ్ దాచు');
+  xb.addEventListener('click', () => { const a = document.activeElement; if (a && a.blur) a.blur(); leaveKb(); });
+  hb.append(mk('‹', true, 'మునుపటి సూచన'), mk('›', false, 'తర్వాతి సూచన'), xb, tg, n, t, l);
+  if (mode === 'solve' && wordDone(cw)) { const ok = document.createElement('span'); ok.className = 'hb-ok'; ok.textContent = '✓ సరైనది'; hb.appendChild(ok); }
+  const en = (puzzle.hintsEn || {})[cw.text];
+  if (showEn && en) { const e = document.createElement('span'); e.className = 'hb-en'; e.lang = 'en'; e.setAttribute('translate', 'no'); e.textContent = en; hb.appendChild(e); }
+}
+if (!/[?&]edit/.test(location.search)) $('editBtn').hidden = true;
+$('clBtn').onclick = () => { const on = !document.body.classList.contains('show-clues'); document.body.classList.toggle('show-clues', on); $('clBtn').setAttribute('aria-pressed', String(on)); $('clBtn').textContent = on ? 'సూచనలు దాచు' : 'అన్ని సూచనలు'; };
+function renderClues() {
+  for (const dir of ['A', 'D']) {
+    const ol = $(dir === 'A' ? 'clA' : 'clD'); ol.textContent = '';
+    W.forEach((w, i) => {
+      if (w.dir !== dir) return;
+      const li = document.createElement('li'); li.className = 'clue'; li.dataset.i = i;
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = w.num; li.appendChild(n);
+      const body = document.createElement('div'); body.className = 't';
+      const hint = puzzle.hints[w.text] || '';
+      if (mode === 'edit') {
+        const inp = document.createElement('input'); inp.className = 'h'; inp.type = 'text'; inp.id = 'hint' + i;
+        inp.value = hint; inp.placeholder = 'సూచన రాయండి'; inp.setAttribute('aria-label', 'సూచన ' + w.num);
+        inp.addEventListener('input', () => { puzzle.hints[w.text] = inp.value; save(); validate(); });
+        inp.addEventListener('click', e => e.stopPropagation());
+        body.appendChild(inp);
+        const a = document.createElement('div'); a.className = 'ans'; a.textContent = w.text + ' · ' + w.cells.length + ' అక్షరాలు'; body.appendChild(a);
+        const ie = document.createElement('input'); ie.className = 'h e2'; ie.type = 'text'; ie.id = 'hinte' + i;
+        ie.value = (puzzle.hintsEn || {})[w.text] || ''; ie.placeholder = 'English hint (keep endings like "to the", "in")'; ie.setAttribute('aria-label', 'English hint ' + w.num);
+        ie.addEventListener('input', () => { puzzle.hintsEn = puzzle.hintsEn || {}; puzzle.hintsEn[w.text] = ie.value; save(); });
+        ie.addEventListener('click', e => e.stopPropagation());
+        body.appendChild(ie);
+      } else {
+        const t = document.createElement('span'); t.textContent = hint || 'సూచన లేదు'; body.appendChild(t);
+        const l = document.createElement('span'); l.className = 'len'; l.textContent = ' (' + w.cells.length + ')'; body.appendChild(l);
+        if (!hint) li.classList.add('nohint');
+        const en = (puzzle.hintsEn || {})[w.text];
+        if (showEn && en) { const d = document.createElement('div'); d.className = 'en'; d.lang = 'en'; d.setAttribute('translate', 'no'); d.textContent = en; body.appendChild(d); }
+      }
+      li.appendChild(body);
+      li.addEventListener('click', () => { const [r0, c0] = firstOpen(w); sel = {r: r0, c: c0, dir: w.dir}; paint(); focusCell(sel.r, sel.c); });
+      ol.appendChild(li);
+    });
+  }
+}
+
+function focusCell(r, c, caretEnd) {
+  const i = $('in' + r + '_' + c); if (!i) return;
+  i.focus({preventScroll: true});
+  if (typeof kbOn !== 'undefined' && kbOn) scheduleScroll();   // keep the active word in view
+  if (caretEnd) { const n = i.value.length; try { i.setSelectionRange(n, n); } catch (e) {} } else i.select();
+}
+
+function onCellClick(e) {
+  const r = +e.currentTarget.dataset.r, c = +e.currentTarget.dataset.c;
+  if (ans(r, c) === BLACK) { if (mode === 'edit') { sel = {r, c, dir: sel.dir}; paint(); } return; }
+  const same = sel.r === r && sel.c === c; const other = sel.dir === 'A' ? 'D' : 'A';
+  let dir = sel.dir;
+  const wA = wordAt(r, c, 'A'), wD = wordAt(r, c, 'D');
+  const openA = !!wA && !(mode === 'solve' && wordDone(wA)), openD = !!wD && !(mode === 'solve' && wordDone(wD));
+  if (openA !== openD) dir = openA ? 'A' : 'D';   // only one of the two words still needs this cell: go to that one, no switching
+  else if (same && wordAt(r, c, other)) dir = other; else if (!wordAt(r, c, dir) && wordAt(r, c, other)) dir = other;
+  sel = {r, c, dir}; paint(); focusCell(r, c);
+}
+
+function step(dr, dc, keepWord) {
+  let r = sel.r + dr, c = sel.c + dc;
+  while (r >= 0 && r < N && c >= 0 && c < N) {
+    if (ans(r, c) !== BLACK) {
+      if (keepWord) { const w = curWord(); if (!w || !w.cells.some(([a, b]) => a === r && b === c)) return; }
+      sel = {r, c, dir: sel.dir}; if (!wordAt(r, c, sel.dir)) sel.dir = sel.dir === 'A' ? 'D' : 'A';
+      paint(); focusCell(r, c); return;
+    }
+    if (keepWord) return; r += dr; c += dc;
+  }
+}
+const seqWords = () => W.filter(w => w.dir === 'A').concat(W.filter(w => w.dir === 'D'));
+function nextWord(back) {   // Tab / Shift+Tab: all across clues in order, then all down clues
+  const sq = seqWords(); if (!sq.length) return;
+  const i = sq.indexOf(curWord()), w = sq[(i + (back ? -1 : 1) + sq.length) % sq.length];
+  const [r, c] = firstOpen(w); sel = {r, c, dir: w.dir}; paint(); focusCell(r, c);
+}
+// the next word, in clue order (across first, then down), that still has an empty cell; opens at its first empty cell
+function goNextWord(from) {
+  if (from && !wordDone(from) && from.cells.some(([r, c]) => isOpen(r, c))) {   // this word still has an empty cell: go back to it first
+    const [r0, c0] = firstOpen(from);
+    if (r0 !== sel.r || c0 !== sel.c) { gotoCell(r0, c0, from.dir); return true; }
+  }
+  const sq = seqWords(); if (!sq.length) return false;
+  const i = from ? sq.indexOf(from) : -1;
+  const order = sq.slice(i + 1).concat(sq.slice(0, i + 1));
+  const w = order.find(x => x !== from && x.cells.some(([r, c]) => isOpen(r, c))) || order.find(x => x !== from && !wordDone(x));
+  if (!w) return false;
+  const [r, c] = firstOpen(w); gotoCell(r, c, w.dir); return true;
+}
+
+const AK = /(?:[క-హౘ-ౚ](?:్[క-హౘ-ౚ])*్?[ా-ౌౕౖ]?[ఁ-ః]?|[అ-ఔౠౡ][ఁ-ః]?|[^\s])/g;
+const aksharas = str => clean(str).match(AK) || [];
+
+/* ---------- English letters to Telugu (naa -> నా) ---------- */
+const CONS = [['chh','ఛ'],['ksh','క్ష'],['jn','జ్ఞ'],['kh','ఖ'],['gh','ఘ'],['ch','చ'],['jh','ఝ'],['ny','ఞ'],['Th','ఠ'],['Dh','ఢ'],['th','థ'],['dhh','ధ'],['dh','ద'],['ph','ఫ'],['bh','భ'],['sh','శ'],['Sh','ష'],
+  ['k','క'],['g','గ'],['c','చ'],['j','జ'],['T','ట'],['D','డ'],['N','ణ'],['t','త'],['d','డ'],['n','న'],['p','ప'],['b','బ'],['m','మ'],['y','య'],['r','ర'],['l','ల'],['v','వ'],['w','వ'],['s','స'],['h','హ'],['L','ళ'],['S','ష'],['f','ఫ'],['q','క'],['z','జ'],['x','క్ష']];
+const VOW = [['aa','ా','ఆ'],['ai','ై','ఐ'],['au','ౌ','ఔ'],['ee','ే','ఏ'],['ii','ీ','ఈ'],['oo','ో','ఓ'],['uu','ూ','ఊ'],['a','','అ'],['i','ి','ఇ'],['u','ు','ఉ'],['e','ె','ఎ'],['o','ొ','ఒ'],
+  ['A','','అ'],['I','ి','ఇ'],['U','ు','ఉ'],['E','ె','ఎ'],['O','ొ','ఒ'],['R','ృ','ఋ']];
+function tokenizeRaw(raw) {
+  const toks = []; let i = 0;
+  while (i < raw.length) {
+    let hit = false;
+    for (const [k, v] of CONS) if (raw.startsWith(k, i)) { toks.push({t: 'c', v, src: k}); i += k.length; hit = true; break; }
+    if (hit) continue;
+    for (const [k, sign, ind] of VOW) if (raw.startsWith(k, i)) { toks.push({t: 'v', sign, ind, src: k}); i += k.length; hit = true; break; }
+    if (hit) continue;
+    if (raw[i] === 'M') toks.push({t: 'x', v: 'ం', src: 'M'}); else if (raw[i] === 'H') toks.push({t: 'x', v: 'ః', src: 'H'}); else toks.push({t: 'o', v: raw[i], src: raw[i]});
+    i++;
+  }
+  return toks;
+}
+function translit(raw, noFinal) {
+  const toks = tokenizeRaw(raw);
+  const n = toks.length;
+  if (!noFinal && n >= 2 && toks[n - 1].t === 'c' && toks[n - 1].v === 'మ' && toks[n - 2].t === 'v') toks[n - 1] = {t: 'x', v: 'ం'};
+  // n or m between a vowel and another consonant is written as the anusvara (pandaga -> పండగ, varangal -> వరంగల్);
+  // not before n, m, y (anna, amma, kanya keep their conjuncts)
+  for (let i = 1; i < n - 1; i++) {
+    const k = toks[i];
+    if (k.t === 'c' && (k.v === 'న' || k.v === 'మ') && toks[i - 1].t === 'v' && toks[i + 1].t === 'c' && !['న', 'మ', 'య'].includes(toks[i + 1].v)) toks[i] = {t: 'x', v: 'ం'};
+  }
+  let out = '', cons = false;
+  for (const k of toks) {
+    if (k.t === 'c') { if (cons) out += '్'; out += k.v; cons = true; }
+    else if (k.t === 'v') { if (cons) { out += k.sign; cons = false; } else out += k.ind; }
+    else if (k.t === 'x') { out += k.v; cons = false; }
+    else { if (cons) { out += '్'; cons = false; } out += k.v; }
+  }
+  if (cons) out += '్';
+  return out;
+}
+let raw = '', rawPos = null, rawPrev = '';
+let useBuiltin = true;
+try { if (localStorage.getItem('tp-builtin-off') === '1') useBuiltin = false; } catch (e) {}
+function syncTT() { const b = $('ttBtn'); if (b) { b.setAttribute('aria-pressed', String(useBuiltin)); b.textContent = 'ఇంగ్లీష్→తెలుగు: ' + (useBuiltin ? 'ఆన్' : 'ఆఫ్'); } }
+function setBuiltin(v) { useBuiltin = v; try { localStorage.setItem('tp-builtin-off', v ? '0' : '1'); } catch (e) {} syncTT(); }
+$('ttBtn').onclick = () => setBuiltin(!useBuiltin);
+syncTT();
+function syncEn() { const b = $('enBtn'); b.setAttribute('aria-pressed', String(showEn)); b.textContent = 'English hints: ' + (showEn ? 'On' : 'Off'); }
+$('enBtn').onclick = () => { showEn = !showEn; try { localStorage.setItem('tp-en', showEn ? '1' : '0'); } catch (e) {} syncEn(); renderClues(); paint(); };
+syncEn();
+function onCompStart(e) {
+  if (raw) { raw = ''; showRaw(); e.target.value = rawPrev; }
+}
+// letters people mix up when typing in English: each key lists the other spellings that can give the cell's letter
+// (nearest first). ta: త/ట/థ/ఠ ..., da: డ/ద/ధ/ఢ ..., plus the aspirates, sibilants and long/short vowels.
+const SWAP = {
+  t: ['T', 'th', 'Th', 'dh', 'd', 'dhh', 'Dh'], T: ['t', 'Th', 'th', 'd', 'dh', 'Dh', 'dhh'],
+  th: ['Th', 't', 'T', 'dhh', 'dh', 'Dh', 'd'], Th: ['th', 'T', 't', 'Dh', 'd', 'dhh', 'dh'],
+  d: ['dh', 'Dh', 'dhh', 'T', 't', 'Th', 'th'], D: ['dh', 'Dh', 'dhh', 'T', 't', 'Th', 'th'],
+  dh: ['d', 'dhh', 'Dh', 't', 'th', 'T', 'Th'], dhh: ['d', 'dh', 'Dh', 'th', 't', 'Th', 'T'],
+  Dh: ['d', 'dhh', 'dh', 'Th', 'T', 'th', 't'],
+  k: ['kh', 'g'], kh: ['k', 'gh'], g: ['gh', 'k'], gh: ['g', 'kh'],
+  c: ['ch', 'chh'], ch: ['c', 'chh'], chh: ['ch', 'c'], j: ['jh', 'z'], jh: ['j'], z: ['j', 'jh'],
+  p: ['ph', 'b'], ph: ['p', 'f', 'bh'], f: ['ph', 'p'], b: ['bh', 'p'], bh: ['b', 'ph'],
+  n: ['N', 'ny'], N: ['n', 'ny'], ny: ['n', 'N'], l: ['L'], L: ['l'],
+  s: ['S', 'sh'], S: ['s', 'sh'], sh: ['s', 'S'], v: ['w'], w: ['v']
+};
+const VSWAP = {a: ['aa', 'ee'], aa: ['a'], i: ['ii', 'ee'], ii: ['i', 'ee'], u: ['uu', 'oo'], uu: ['u', 'oo'], e: ['ee'], ee: ['e', 'ii', 'i'], o: ['oo'], oo: ['o', 'uu', 'u']};
+let altRaws = [];
+const rawStore = {};   // "r,c" -> {raw, val}: what was typed for a cell, so other spellings can be offered later
+// every Telugu form an akshara could be typed as (any alternative letter in any position)
+function allForms(r0) {
+  const toks = tokenizeRaw(r0); let combos = [toks.map(x => x.src)];
+  toks.forEach((tk, i) => {
+    const table = tk.t === 'c' ? SWAP : tk.t === 'v' ? VSWAP : null;
+    if (!table || !table[tk.src]) return;
+    const next = [];
+    for (const c of combos) { next.push(c); for (const alt of table[tk.src]) { const d = c.slice(); d[i] = alt; next.push(d); } }
+    combos = next.slice(0, 256);
+  });
+  const forms = combos.map(c => translit(c.join('')));
+  const n = toks.length, last = toks[n - 1];
+  if (n >= 2 && last.t === 'c' && (last.v === 'న' || last.v === 'మ') && toks[n - 2].t === 'v')   // a closing n/m can be the anusvara: pan -> పం
+    forms.push(...combos.map(c => translit(c.slice(0, -1).join('')) + 'ం'));
+  return [...new Set(forms)];
+}
+// while solving, if what was typed could be the cell's own letter (న/ణ, ర/రా, ద/డ ...), the cell's letter goes in
+function resolveAk(rawAk, r, c) {
+  const t = translit(rawAk);
+  if (mode !== 'solve') return t;
+  const a = clean(ans(r, c)); if (!a || a === BLACK) return t;
+  return allForms(rawAk).includes(a) ? a : t;
+}
+function variants(r0) {
+  const toks = tokenizeRaw(r0), cur = translit(r0), seen = new Set([cur]), out = [];
+  toks.forEach((tk, i) => {
+    const table = tk.t === 'c' ? SWAP : tk.t === 'v' ? VSWAP : null;
+    if (!table || !table[tk.src]) return;
+    for (const alt of table[tk.src]) {
+      const v = toks.map((x, j) => j === i ? alt : x.src).join(''), tel = translit(v);
+      if (!seen.has(tel)) { seen.add(tel); out.push(v); }
+    }
+  });
+  return out.slice(0, 10);
+}
+function pickAlt(i) {
+  if (!rawPos || !altRaws[i]) return;
+  const el = $('in' + rawPos.r + '_' + rawPos.c); raw = altRaws[i]; if (el) { el.value = translit(raw); showRaw(); focusCell(rawPos.r, rawPos.c, true); }
+}
+function chipsFor(box, label, raws, onPick, fmt) {
+  if (!raws.length) return;
+  box.append(label);
+  raws.forEach((v, i) => {
+    const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'chip'; chip.textContent = (i + 1) + ' ' + (fmt ? fmt(v) : translit(v));
+    chip.addEventListener('mousedown', ev => ev.preventDefault());
+    chip.addEventListener('click', () => onPick(i, v));
+    box.appendChild(chip);
+  });
+}
+function showRaw0() {
+  const t = $('typing'); t.textContent = ''; altRaws = [];
+  if (!raw) return;
+  const b = document.createElement('b'); b.textContent = rawText();
+  t.append(raw + ' → ', b);
+  const shown = rawText(), fmt = v => rawPos ? resolveAk(v, rawPos.r, rawPos.c) : translit(v);
+  if (mode === 'solve' && rawPos && isLocked(rawPos.r, rawPos.c)) { altRaws = []; return; }
+  altRaws = variants(raw).filter(v => fmt(v) !== shown);
+  chipsFor(t, '   ఇతర రూపాలు: ', altRaws, i => pickAlt(i), fmt);
+}
+// idle cursor on a cell that was typed in English: offer its other spellings
+function showCellAlts0() {
+  if (raw) return;
+  if (mode === 'solve' && isLocked(sel.r, sel.c)) { $('typing').textContent = ''; return; }
+  const t = $('typing'); t.textContent = '';
+  const st0 = rawStore[sel.r + ',' + sel.c]; if (!st0) return;
+  const cur = mode === 'edit' ? puzzle.grid[sel.r][sel.c] : entries[sel.r][sel.c];
+  if (clean(cur) !== st0.val) return;
+  const alts = [st0.raw, ...variants(st0.raw)].filter(v => translit(v) !== st0.val).slice(0, 8);
+  chipsFor(t, 'ఈ గడికి ఇతర రూపాలు: ', alts, (i, v) => {
+    const key = sel.r + ',' + sel.c, val = translit(v); rawStore[key] = {raw: v, val};
+    setVal(sel.r, sel.c, val); commit(); focusCell(sel.r, sel.c);
+  });
+}
+// the new letter k starts a new akshara when adding it makes more than one; returns how raw0 splits
+function splitStep(raw0, k) {
+  const parts = aksharas(translit(raw0 + k));
+  if (parts.length <= 1) return null;
+  if (k === 'n' && parts.length === 2 && parts[1] === 'న్') return null;   // a lone n after a vowel may still become the anusvara (pa+n+da -> పం|డ)
+  let cut = 0;
+  for (let i = raw0.length; i >= 1; i--) if (translit(raw0.slice(0, i), true) === parts[0]) { cut = i; break; }
+  if (!cut) cut = raw0.length;
+  let firstRaw = raw0.slice(0, cut);
+  if (parts[0].endsWith('ం') && /[nm]$/.test(firstRaw)) firstRaw = firstRaw.slice(0, -1) + 'M';   // pan|da: the n is the anusvara of పం
+  return {firstRaw, rest: raw0.slice(cut)};
+}
+function rawList(word) {
+  const list = []; let cur = '';
+  for (const ch of word) {
+    if (cur) { const sp = splitStep(cur, ch); if (sp) { list.push(sp.firstRaw); cur = sp.rest + ch; continue; } }
+    cur += ch;
+  }
+  while (cur) {   // what is left may be a dangling n that stayed a separate akshara: split it off
+    const parts = aksharas(translit(cur)); let cut = 0;
+    if (parts.length > 1) for (let i = cur.length - 1; i >= 1; i--) if (translit(cur.slice(0, i), true) === parts[0]) { cut = i; break; }
+    if (!cut) { list.push(cur); break; }
+    list.push(cur.slice(0, cut)); cur = cur.slice(cut);
+  }
+  return list;
+}
+const dvec = () => sel.dir === 'D' ? [1, 0] : [0, 1];
+function advance() {   // next open cell along the active word, or the next unfinished word
+  const [dr, dc] = dvec(), r = sel.r + dr, c = sel.c + dc;
+  if (white(r, c)) gotoCell(r, c, sel.dir); else goNextWord(curWord());
+}
+// A whole word typed while its first cells are already filled and the cursor sits on the first empty one (so the typed text
+// begins with the word's own first letter): start from the word's first cell, the filled ones take their letters again.
+function rewindStart(r, c, forms) {
+  if (mode !== 'solve' || !forms || !forms.length) return null;
+  const w = curWord(); if (!w) return null;
+  const i = w.cells.findIndex(([a, b]) => a === r && b === c);
+  if (i <= 0 || !isOpen(r, c)) return null;
+  for (let j = 0; j < i; j++) if (isOpen(w.cells[j][0], w.cells[j][1])) return null;
+  const a0 = clean(ans(w.cells[0][0], w.cells[0][1])), ai = clean(ans(r, c));
+  return forms.includes(a0) && !forms.includes(ai) ? w.cells[0] : null;
+}
+function putAk(r, c, rawAk) {
+  lastAuto = null;
+  if (mode === 'solve' && isLocked(r, c)) {
+    // the cursor is on a cell that is already correct: typing its own letter just moves on; anything else belongs to the next open cell
+    const el0 = $('in' + r + '_' + c); if (el0) el0.value = entries[r][c] || '';
+    jumped = false; sel = {r, c, dir: sel.dir};
+    return resolveAk(rawAk, r, c) === clean(ans(r, c)) ? '' : rawAk;
+  }
+  const t = resolveAk(rawAk, r, c); rawStore[r + ',' + c] = {raw: rawAk, val: t};
+  applyParts(r, c, aksharas(t), false);
+  return '';
+}
+function pushRaw(el, k) {
+  const cell = el.parentElement; const pos = {r: +cell.dataset.r, c: +cell.dataset.c};
+  if (lastAuto && !raw && Date.now() - lastAuto.t < 2500) {
+    const la = lastAuto; lastAuto = null;
+    // a late letter that would only have made the settled akshara longer, but still the same letter (ra + a = raa), and that
+    // is not a sensible start for the cell the cursor is in now: swallow it
+    if (!splitStep(la.raw, k) && resolveAk(la.raw + k, la.r, la.c) === la.val && translit(la.raw + k) !== translit(la.raw)
+        && !(mode === 'solve' && !isLocked(pos.r, pos.c) && resolveAk(k, pos.r, pos.c) === clean(ans(pos.r, pos.c)))) return;
+  }
+  const lockedHere = mode === 'solve' && isLocked(pos.r, pos.c);
+  if (!raw || !rawPos || rawPos.r !== pos.r || rawPos.c !== pos.c) { raw = ''; rawPos = pos; rawPrev = el.value; }
+  if (raw) {
+    const sp = splitStep(raw, k);
+    if (sp) {   // the new letter starts the next akshara: settle this cell and move on
+      const r0 = rawPos.r, c0 = rawPos.c; raw = ''; showRaw();
+      let tr = r0, tc = c0; const rw = rewindStart(r0, c0, allForms(sp.firstRaw));
+      if (rw) { const e0 = $('in' + r0 + '_' + c0); if (e0) e0.value = ''; tr = rw[0]; tc = rw[1]; sel = {r: tr, c: tc, dir: sel.dir}; }
+      const replay = putAk(tr, tc, sp.firstRaw); if (!jumped) advance();
+      const ne = $('in' + sel.r + '_' + sel.c);
+      if (ne && ne !== el) { rawPos = {r: sel.r, c: sel.c}; rawPrev = ne.value; raw = (replay || '') + sp.rest; pushRaw(ne, k); return; }
+    }
+  }
+  raw += k; if (!lockedHere) el.value = rawText(); showRaw(); scheduleAuto();
+}
+function popRaw(el) { raw = raw.slice(0, -1); el.value = raw ? rawText() : rawPrev; showRaw(); scheduleAuto(); }
+// while solving: once what was typed matches the cell's letter and typing pauses, settle it and move on
+let lastAuto = null;
+function scheduleAuto(ms) {
+  clearTimeout(autoTimer);
+  if (mode !== 'solve' || !raw || !rawPos) return;
+  autoTimer = setTimeout(() => {
+    if (!raw || !rawPos) return;
+    const {r, c} = rawPos;
+    if (rawText() !== clean(ans(r, c))) {
+      // typed on a correct cell, and it can no longer become that cell's letter: it belongs to the next open cell
+      if (isLocked(r, c)) { const la = clean(ans(r, c)), rt = rawText().replace(/\u0C4D$/, ''); if (!la.startsWith(rt)) commitRaw(); }
+      return;
+    }
+    const settled = {r, c, raw, val: clean(ans(r, c)), t: Date.now()};
+    commitRaw(); lastAuto = settled; lastAdvAt = Date.now(); if (!jumped) advance();
+  }, ms || 450);
+}
+function rawText() { return rawPos ? resolveAk(raw, rawPos.r, rawPos.c) : translit(raw); }
+function commitRaw(fromBlur) {
+  if (!raw || !rawPos) return false;
+  clearTimeout(autoTimer);
+  const {r, c} = rawPos, rw = raw; raw = ''; showRaw();
+  const replay = putAk(r, c, rw);
+  if (replay && !fromBlur && !jumped) {   // typed on a correct cell but meant for the next open one
+    advance();
+    const ne = $('in' + sel.r + '_' + sel.c);
+    if (ne) { rawPos = {r: sel.r, c: sel.c}; rawPrev = ne.value; raw = replay; if (!(mode === 'solve' && isLocked(sel.r, sel.c))) ne.value = rawText(); showRaw(); scheduleAuto(90); return true; }
+  }
+  return false;
+}
+// a whole English word typed or pasted: one akshara per cell along the active word
+function fillWordRaw(r, c, word) {
+  lastAuto = null;
+  const list = rawList(word), [dr, dc] = dvec();
+  const rw = list.length ? rewindStart(r, c, allForms(list[0])) : null; if (rw) { r = rw[0]; c = rw[1]; }
+  { let n = 0, a = r, b = c; while (white(a, b)) { n++; a += dr; b += dc; }   // more pieces than cells left, ending in a lone n/m: it is the anusvara of the one before (ran -> రం)
+    if (list.length > n && list.length > 1 && /^[nm]$/.test(list[list.length - 1])) { const m = list.pop(); list[list.length - 1] += 'M'; } }
+  let rr = r, cc = c, last = null, i = 0;
+  while (i < list.length && white(rr, cc)) {
+    const t = resolveAk(list[i], rr, cc);
+    if (mode === 'solve' && isLocked(rr, cc)) { if (t === clean(ans(rr, cc))) i++; last = [rr, cc]; rr += dr; cc += dc; continue; }
+    rawStore[rr + ',' + cc] = {raw: list[i], val: t}; setVal(rr, cc, t); last = [rr, cc]; i++; rr += dr; cc += dc;
+  }
+  if (!last) return;
+  jumped = false; sel = {r: last[0], c: last[1], dir: sel.dir}; commit(); if (!jumped) { lastAdvAt = Date.now(); advance(); }
+}
+
+function setVal(r, c, v) {
+  if (mode === 'solve' && isLocked(r, c)) return;
+  if (mode === 'edit') puzzle.grid[r][c] = v; else entries[r][c] = v;
+  if (mode === 'solve' && clean(v) && clean(v) !== clean(ans(r, c))) { try { dbg('WRONG', 'r' + (r + 1) + 'c' + (c + 1) + ' typed ' + v + ' want ' + ans(r, c) + (raw ? ' raw=' + raw : '')); } catch (e) {} }
+  const i = $('in' + r + '_' + c); if (i && i.value !== v) i.value = v;
+}
+function commit() {
+  if (mode === 'edit') { analyze(); renderClues(); updateNumbers(); validate(); } else noteActive();
+  let jump = null;
+  if (mode === 'solve') {
+    const cw0 = curWord();
+    W.forEach(w => { const key = w.num + w.dir; if (wordDone(w)) { if (!doneWords.has(key)) { doneWords.add(key); if (w === cw0) jump = w; } } else doneWords.delete(key); });
+  }
+  save(); paint();
+  if (jump) { jumped = true; goNextWord(jump); }   // the active word is now correct: move straight on
+}
+function onInput(e) {
+  if (e.isComposing) return;   // never touch the field while a keyboard is still composing
+  onInputCore(e);
+  const el = e.target;
+  if (mode === 'solve' && el && el.parentElement && el.parentElement.dataset && el.parentElement.dataset.r !== undefined) {
+    const r = +el.parentElement.dataset.r, c = +el.parentElement.dataset.c;
+    if (isLocked(r, c)) el.value = entries[r][c] || '';   // a correct cell always keeps its own letter
+  }
+}
+function onInputCore(e) {
+  if (e.isComposing) return;
+  if (!(e.inputType === 'insertText' && e.data && /^[A-Za-z]$/.test(e.data))) lastAuto = null;
+  const el = e.target; const cell = el.parentElement; const r = +cell.dataset.r, c = +cell.dataset.c;
+  const ch = e.data;
+  if (e.inputType && e.inputType.startsWith('delete')) {   // soft-keyboard Backspace: remove the whole akshara and stay put
+    if (raw && rawPos && rawPos.r === r && rawPos.c === c) { popRaw(el); return; }
+    if (mode === 'solve' && isLocked(r, c)) { onBackspace(el); return; }
+    if (!(mode === 'edit' ? puzzle.grid[r][c] : clean(entries[r][c]))) { onBackspace(el); return; }   // already empty: step back by word
+    setVal(r, c, ''); el.value = ''; commit(); return;
+  }
+  if (useBuiltin && e.inputType === 'insertText' && ch && /^[A-Za-z]$/.test(ch)) {   // letter arrived as plain input (soft keyboards)
+    el.value = (rawPos && rawPos.r === r && rawPos.c === c && raw) ? translit(raw) : (mode === 'edit' ? puzzle.grid[r][c] : entries[r][c]);
+    pushRaw(el, (raw && rawPos && rawPos.r === r && rawPos.c === c) ? ch : ch.toLowerCase()); return;   // a capital that starts a cell is the keyboard's auto-capital
+  }
+  // what the keyboard just inserted (not the cell's old content, which stays in the field and would be read again)
+  const typed = e.data ? e.data : el.value;
+  if (typed.includes('#') && mode === 'edit') { el.value = ans(r, c); toggleBlack(); return; }
+  const latin = clean(typed);
+  if (useBuiltin && /^[A-Za-z]+$/.test(latin)) { fillWordRaw(r, c, latin.length > 1 && latin === latin.toUpperCase() ? latin.toLowerCase() : latin[0].toLowerCase() + latin.slice(1)); return; }   // pasted or composed English word
+  if (e.data === ' ' && /\s$/.test(el.value)) {   // space typed on a soft keyboard: commit the letter and move on
+    if (Date.now() - lastAdvAt < 600) { el.value = (mode === 'edit' ? puzzle.grid[r][c] : entries[r][c]) || ''; return; }   // the keyboard's own space after a word we already moved on from
+    const t = el.value.replace(/\s+$/, ''); el.value = t;
+    jumped = false; if (t) applyParts(r, c, aksharas(t), false);
+    if (!jumped) onSpace(); return;
+  }
+  const stored = mode === 'edit' ? puzzle.grid[r][c] : entries[r][c];
+  const teluguOnly = aksharas(typed).filter(x => /[\u0C00-\u0C7F]/.test(x));
+  if (!teluguOnly.length) { el.value = stored || ''; return; }   // digits, punctuation, emoji: ignored
+  const parts = teluguOnly, key = r + ',' + c + ':' + parts.join(''), now = Date.now();
+  if (lastIn.key === key && now - lastIn.t < 80) return;   // compositionend and input can both report the same text
+  lastIn = {key, t: now};
+  if (lockedPending && now - lockedPending.t < 2500) {   // the rest of a correct cell's letter, sent character by character
+    const t0 = parts.join('');
+    if (lockedPending.rest.startsWith(t0)) { lockedPending.rest = lockedPending.rest.slice(t0.length); lockedPending.t = now; el.value = stored || ''; if (!lockedPending.rest) lockedPending = null; return; }
+    lockedPending = null;
+  }
+  // some Telugu keyboards send an akshara one character at a time (క, ్, ష, ా ...): join the follow-up to the previous cell
+  if (lastPut && now - lastPut.t < 2500 && !(lastPut.r === r && lastPut.c === c) && !(mode === 'solve' && isLocked(lastPut.r, lastPut.c))) {
+    const prevVal = clean(mode === 'edit' ? puzzle.grid[lastPut.r][lastPut.c] : entries[lastPut.r][lastPut.c]);
+    const txt = parts.join('');
+    if (prevVal) {
+      const comb = aksharas(prevVal + txt);
+      if (comb.length < aksharas(prevVal).length + parts.length) {
+        el.value = stored || '';
+        setVal(lastPut.r, lastPut.c, comb[0]); lastPut.t = now;
+        jumped = false; commit();
+        const rest = comb.slice(1);
+        if (rest.length && !jumped) applyParts(r, c, rest, true);
+        return;
+      }
+    }
+  }
+  applyParts(r, c, parts, true);
+}
+let lastPut = null, lockedPending = null, lastAdvAt = 0;
+let lastIn = {key: '', t: 0};
+// One akshara goes in its own cell. Several (a typed or pasted word) fill the following cells along the active word,
+// across or down.
+function applyParts(r, c, parts, adv) {
+  const rw = parts.length > 1 ? rewindStart(r, c, [clean(parts[0])]) : null; if (rw) { r = rw[0]; c = rw[1]; }
+  const [dr, dc] = dvec(); let rr = r, cc = c, last = null, i = 0;
+  while (i < parts.length && white(rr, cc)) {
+    if (mode === 'solve' && isLocked(rr, cc)) {
+      const la = clean(ans(rr, cc)), pp = clean(parts[i]);
+      if (pp === la) i++;
+      else if (la.length > pp.length && la.startsWith(pp)) { i++; lockedPending = {rest: la.slice(pp.length), t: Date.now()}; }
+      last = [rr, cc]; rr += dr; cc += dc; continue;
+    }
+    setVal(rr, cc, parts[i]); last = [rr, cc]; i++; rr += dr; cc += dc;
+  }
+  jumped = false;
+  if (!last) { setVal(r, c, ''); commit(); return; }
+  sel = {r: last[0], c: last[1], dir: sel.dir};
+  if (adv) lastPut = {r: last[0], c: last[1], t: Date.now()};
+  commit();
+  if (jumped) return;
+  if (adv) { lastAdvAt = Date.now(); advance(); } else if (parts.length > 1) focusCell(last[0], last[1], true);
+}
+const white = (r, c) => r >= 0 && r < N && c >= 0 && c < N && ans(r, c) !== BLACK;
+function gotoCell(r, c, dir) { sel = {r, c, dir}; paint(); focusCell(r, c); }
+const isOpen = (r, c) => !(mode === 'edit' ? puzzle.grid[r][c] : clean(entries[r][c]));
+function firstOpen(w) { return w.cells.find(([r, c]) => isOpen(r, c)) || w.cells[0]; }
+// the next word of this direction that still has an empty cell (or simply the next one), opened at its first empty cell
+function nextWordStart() { goNextWord(curWord()); }
+
+// Backspace follows the words, not the rows: a filled cell is cleared; on an empty cell step back to the previous
+// open cell of the same word, and at the start of a word go to the last cell of the previous word (clue order:
+// all across, then all down). Locked (correct) cells are skipped.
+function prevWordCell(w) {
+  const sq = seqWords(); if (!sq.length) return null;
+  const i = sq.indexOf(w);
+  for (let k = 1; k < sq.length; k++) {
+    const x = sq[((i < 0 ? 0 : i) - k + sq.length * 2) % sq.length];
+    for (let j = x.cells.length - 1; j >= 0; j--) { const [r, c] = x.cells[j]; if (!(mode === 'solve' && isLocked(r, c))) return {r, c, dir: x.dir}; }
+  }
+  return null;
+}
+function onBackspace(el) {
+  const r = sel.r, c = sel.c, lk = (a, b) => mode === 'solve' && isLocked(a, b);
+  if (!lk(r, c)) {
+    const has = mode === 'edit' ? !!puzzle.grid[r][c] : !!clean(entries[r][c]);
+    if (has || el.value) { setVal(r, c, ''); el.value = ''; commit(); return; }
+  }
+  const w = curWord();
+  if (w) {
+    const i = w.cells.findIndex(([a, b]) => a === r && b === c);
+    for (let j = i - 1; j >= 0; j--) { const [a, b] = w.cells[j]; if (!lk(a, b)) { gotoCell(a, b, w.dir); return; } }
+    const p = prevWordCell(w); if (p) gotoCell(p.r, p.c, p.dir);
+  }
+}
+
+// Arrow movement skips black cells and wraps: right/left run on to the next/previous row,
+// down/up run on to the next/previous column, and the grid wraps round at its ends.
+function goHere(r, c, pref) { gotoCell(r, c, wordAt(r, c, pref) ? pref : (pref === 'A' ? 'D' : 'A')); }
+function moveH(d) {
+  let r = sel.r, c = sel.c;
+  for (let i = 0; i < N * N; i++) {
+    c += d;
+    if (c >= N) { c = 0; r = (r + 1) % N; } else if (c < 0) { c = N - 1; r = (r - 1 + N) % N; }
+    if (white(r, c)) { goHere(r, c, 'A'); return; }
+  }
+}
+function moveV(d) {
+  let r = sel.r, c = sel.c;
+  for (let i = 0; i < N * N; i++) {
+    r += d;
+    if (r >= N) { r = 0; c = (c + 1) % N; } else if (r < 0) { r = N - 1; c = (c - 1 + N) % N; }
+    if (white(r, c)) { goHere(r, c, 'D'); return; }
+  }
+}
+function rowEdge(end) {
+  const r = sel.r;
+  if (end) { for (let c = N - 1; c >= 0; c--) if (white(r, c)) return goHere(r, c, 'A'); }
+  else { for (let c = 0; c < N; c++) if (white(r, c)) return goHere(r, c, 'A'); }
+}
+function onSpace() { if (white(sel.r, sel.c + 1)) gotoCell(sel.r, sel.c + 1, 'A'); else nextWordStart('A'); }
+function onEnter() { if (white(sel.r + 1, sel.c)) gotoCell(sel.r + 1, sel.c, 'D'); else nextWordStart('D'); }
+function onKey(e) {
+  const el = e.target; if (mode === 'solve') lastActive = Date.now();
+  if (e.isComposing) return;
+  const k = e.key;
+  if (mode === 'solve' && isLocked(sel.r, sel.c) && /^[0-9]$/.test(k) && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); return; }
+  if (useBuiltin && e.keyCode !== 229 && !e.ctrlKey && !e.metaKey && !e.altKey && /^[A-Za-z]$/.test(k)) { e.preventDefault(); pushRaw(el, (!raw && !e.shiftKey) ? k.toLowerCase() : k); return; }
+  if (raw && useBuiltin && /^[1-9]$/.test(k) && altRaws[+k - 1]) { e.preventDefault(); pickAlt(+k - 1); return; }
+  if (k === 'Backspace' && raw && useBuiltin) { e.preventDefault(); popRaw(el); return; }
+  if (raw && (k === ' ' || k === 'Enter' || k === 'Tab' || k.startsWith('Arrow'))) { jumped = false; const moved = commitRaw(); if (jumped || moved) { e.preventDefault(); return; } }
+  const d = sel.dir;
+  if ((e.key === ' ' || e.key === 'Enter') && Date.now() - lastAdvAt < 500) { e.preventDefault(); return; }   // already moved on by itself
+  if (e.key === ' ') { e.preventDefault(); onSpace(); }
+  else if (e.key === 'Enter') { e.preventDefault(); onEnter(); }
+  else if (e.key === 'Tab') { e.preventDefault(); nextWord(e.shiftKey); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); moveH(1); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); moveH(-1); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); moveV(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); moveV(-1); }
+  else if (e.key === 'Home') { e.preventDefault(); rowEdge(false); }
+  else if (e.key === 'End') { e.preventDefault(); rowEdge(true); }
+  else if (e.key === 'Backspace') { e.preventDefault(); onBackspace(el); }
+}
+function updateNumbers() {
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const el = cellEl(r, c); const old = el.querySelector('.num'); if (old) old.remove();
+    const n = numAt(r, c);
+    if (n && ans(r, c) !== BLACK) { const s = document.createElement('span'); s.className = 'num'; s.textContent = n; el.prepend(s); }
+  }
+}
+
+function reveal(cells) { for (const [r, c] of cells) { entries[r][c] = ans(r, c); const i = $('in' + r + '_' + c); if (i) i.value = ans(r, c); } save(); paint(); }
+$('rvCell').onclick = () => { if (mode === 'solve' && ans(sel.r, sel.c) !== BLACK) { st.revealCell++; noteActive(true); reveal([[sel.r, sel.c]]); } };
+$('rvWord').onclick = () => { const w = curWord(); if (mode === 'solve' && w) { st.revealWord++; if (!st.revealedWords.includes(w.text)) st.revealedWords.push(w.text); noteActive(true); reveal(w.cells); } };
+$('clr').onclick = () => {
+  if (mode !== 'solve') return;
+  entries = Array.from({length: N}, () => Array(N).fill('')); doneWords = new Set(); save();
+  Object.assign(st, {startedAt: 0, activeSec: 0, done: false, doneAt: 0, revealCell: 0, revealWord: 0, revealAll: 0, checks: 0, revealedWords: [], wordSec: {}});   // a fresh run starts the clock again
+  document.querySelectorAll('.cell input').forEach(i => i.value = ''); checkOn = false; $('chk').setAttribute('aria-pressed', 'false'); paint(); dirty = true; flush();
+};
+
+/* live error catcher: with this on, a wrong letter is marked red the moment it is filled in (no need to press తనిఖీ) */
+try { liveOn = localStorage.getItem('tp-live') === '1'; } catch (e) {}
+function syncLive() { const b = $('liveBtn'); b.setAttribute('aria-pressed', String(liveOn)); b.textContent = 'తప్పులు'; }
+$('liveBtn').addEventListener('pointerdown', ev => ev.preventDefault());
+$('liveBtn').onclick = () => { liveOn = !liveOn; try { localStorage.setItem('tp-live', liveOn ? '1' : '0'); } catch (e) {} syncLive(); paint(); };
+syncLive();
+/* ?debug shows a log of script errors and wrong fills (what was typed, in which cell) with a copy button */
+const DBG = [];
+function dbg(kind, msg) { DBG.push(new Date().toISOString().slice(11, 19) + ' ' + kind + ' ' + msg); if (DBG.length > 200) DBG.shift(); const p = document.getElementById('dbgPanel'); if (p) p.querySelector('pre').textContent = DBG.join('\n'); }
+window.addEventListener('error', e => dbg('ERR', e.message + ' @' + (e.lineno || '')));
+window.addEventListener('unhandledrejection', e => dbg('REJ', String(e.reason)));
+if (/[?&]debug/.test(location.search)) {
+  const p = document.createElement('div'); p.id = 'dbgPanel'; p.style.cssText = 'margin:12px;padding:8px;border:1px dashed #c33;font:12px/1.4 monospace;background:#fff;color:#222';
+  p.innerHTML = '<b>debug log</b> <button type="button" id="dbgCopy">copy</button><pre style="white-space:pre-wrap;max-height:160px;overflow:auto;margin:6px 0 0"></pre>';
+  document.body.appendChild(p); $('dbgCopy').onclick = () => { try { navigator.clipboard.writeText(DBG.join('\n')); } catch (e) {} };
+}
+$('chk').onclick = () => { if (mode !== 'solve') return; checkOn = !checkOn; if (checkOn) { st.checks++; noteActive(true); } $('chk').setAttribute('aria-pressed', String(checkOn)); paint(); };
+
+function setMode(m) {
+  mode = m; $('editBtn').setAttribute('aria-pressed', String(m === 'edit'));
+  $('editPanel').hidden = m !== 'edit';
+  for (const id of ['rvCell', 'rvWord', 'chk', 'clr']) $(id).disabled = m === 'edit';
+  $('hintline').textContent = m === 'edit' ? 'సవరణ మోడ్: ఎంచుకున్న గడిలో సమాధాన అక్షరం టైప్ చేయండి.' : 'ఇంగ్లీష్ అక్షరాలతో టైప్ చేయవచ్చు: naa → నా, amaraavati → అమరావతి (కీబోర్డ్ మార్చాల్సిన పనిలేదు; మీ సొంత తెలుగు కీబోర్డ్ వాడాలంటే బటన్‌తో ఆఫ్ చేయండి). M = ం, H = ః, T N L S = ట ణ ళ ష (ఫోన్‌లో మొదటి అక్షరం ఆటోమేటిక్‌గా క్యాపిటల్ అయితే దాన్ని చిన్న అక్షరంగానే తీసుకుంటాను; ట/ణ/ళ/ష కోసం ఇతర రూపాల చిప్స్ వాడండి); d = డ, dh = ద, dhh = ధ. అచ్చులు: a i u e o = అ ఇ ఉ ఎ ఒ; అక్షరాన్ని రెండుసార్లు రాస్తే దీర్ఘం: aa ii uu ee oo = ఆ ఈ ఊ ఏ ఓ. ద/డ లాంటి జతల్లో రాసేటప్పుడు కింద చూపే ఇతర రూపాల్లో ఒకదాన్ని నంబర్ కీ (1, 2…) తో లేదా నొక్కి ఎంచుకోవచ్చు. ఒక గడిలో ఒక అక్షరమే; ఎంచుకున్న పదంలో (అడ్డం లేదా నిలువు) అక్షరం పూర్తయ్యాక కర్సర్ ఆటోమేటిక్‌గా తర్వాతి గడికి వెళ్తుంది. Space నొక్కితే కుడివైపు గడికి (లేదా తర్వాతి అడ్డం పదానికి), Enter నొక్కితే కింది గడికి వెళ్తుంది. పదాన్ని ఒకేసారి టైప్ చేయవచ్చు, అడ్డంగా అయినా నిలువుగా అయినా: ఎంచుకున్న సూచన దిశలో గడులన్నీ వరుసగా నిండుతాయి. మీరు టైప్ చేసినది ఆ గడిలోని సరైన అక్షరానికి సరిపోతే (ణ/న, ర/రా, డ/ద లాంటివి) సరైన అక్షరమే పడుతుంది.';
+  analyze(); doneWords = new Set(); if (m === 'solve') W.forEach(w => { if (wordDone(w)) doneWords.add(w.num + w.dir); });
+  buildBoard(); renderClues(); validate(); paint();
+}
+$('editBtn').onclick = () => setMode(mode === 'edit' ? 'solve' : 'edit');
+
+function toggleBlack() {
+  const {r, c} = sel; puzzle.grid[r][c] = puzzle.grid[r][c] === BLACK ? '' : BLACK; entries[r][c] = '';
+  analyze();
+  if (!wordAt(r, c, sel.dir)) sel.dir = sel.dir === 'A' ? 'D' : 'A';
+  buildBoard(); renderClues(); validate(); save(); paint(); if (puzzle.grid[r][c] !== BLACK) focusCell(r, c);
+}
+$('toggleBlack').onclick = toggleBlack;
+
+function validate() {
+  const msgs = [];
+  const seen = {};
+  for (const w of W) {
+    if (w.cells.some(([r, c]) => !ans(r, c))) msgs.push(w.num + (w.dir === 'A' ? ' అడ్డం' : ' నిలువు') + ': ఖాళీ గడి ఉంది');
+    else if (!(puzzle.hints[w.text] || '').trim()) msgs.push(w.num + (w.dir === 'A' ? ' అడ్డం' : ' నిలువు') + ' (' + w.text + '): సూచన లేదు');
+    seen[w.text] = (seen[w.text] || 0) + 1;
+  }
+  for (const k in seen) if (seen[k] > 1) msgs.push('"' + k + '" రెండుసార్లు వచ్చింది');
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) if (ans(r, c) !== BLACK && !cellWords[r + ',' + c]) msgs.push('వరుస ' + (r + 1) + ', నిలువు ' + (c + 1) + ': ఏ పదంలోనూ లేని గడి');
+  const ul = $('warns'); ul.textContent = ''; msgs.forEach(m => { const li = document.createElement('li'); li.textContent = m; ul.appendChild(li); });
+}
+
+function exportJson() {
+  const hints = {}; W.forEach(w => { hints[w.text] = puzzle.hints[w.text] || ''; });
+  const hintsEn = {}; W.forEach(w => { hintsEn[w.text] = (puzzle.hintsEn || {})[w.text] || ''; });
+  return JSON.stringify({title: puzzle.title, date: puzzle.date, grid: puzzle.grid.map(r => r.join(' ')), hints, hintsEn}, null, 1);
+}
+$('copyJson').onclick = async () => {
+  const t = exportJson(); const box = $('importBox');
+  try { await navigator.clipboard.writeText(t); $('editMsg').textContent = 'కాపీ అయింది'; }
+  catch (e) { box.value = t; box.focus(); box.select(); $('editMsg').textContent = 'కింది పెట్టెలో ఉంది, కాపీ చేయండి'; }
+};
+$('importBtn').onclick = () => {
+  try {
+    const d = JSON.parse($('importBox').value);
+    const g = d.grid.map(r => Array.isArray(r) ? r : r.split(' '));
+    if (g.length !== N || g.some(r => r.length !== N)) throw new Error('size');
+    puzzle = {title: d.title || 'తెలుగు పదకేళి', date: d.date || '', grid: g, hints: d.hints || {}, hintsEn: d.hintsEn || {}};
+    entries = Array.from({length: N}, () => Array(N).fill(''));
+    
+$('title').textContent = puzzle.title; $('meta').textContent = puzzle.date; save(); setMode(mode); $('editMsg').textContent = 'లోడ్ అయింది';
+  } catch (e) { $('editMsg').textContent = 'JSON సరిగా లేదు (10×10 గ్రిడ్ కావాలి)'; }
+};
+$('resetBtn').onclick = () => {
+  if (!blackConfirm) { blackConfirm = true; $('resetBtn').textContent = 'నిజంగానా? మళ్ళీ నొక్కండి'; setTimeout(() => { blackConfirm = false; $('resetBtn').textContent = 'మొదటి పజిల్ తెచ్చుకో'; }, 3500); return; }
+  blackConfirm = false; $('resetBtn').textContent = 'మొదటి పజిల్ తెచ్చుకో';
+  puzzle = clone(BASE); entries = Array.from({length: N}, () => Array(N).fill('')); save(); setMode(mode);
+};
+
+
+/* ---------- compact typing mode: when the keyboard is up on a phone, hide the extras and fit the grid above it ---------- */
+const narrowScreen = () => window.matchMedia('(max-width: 860px)').matches;
+let kbOn = false, kbTimer = 0;
+function fitBoard() {
+  const b = $('board'); if (!b) return;
+  if (!kbOn) { b.style.removeProperty('--cs'); return; }
+  b.style.setProperty('--cs', Math.floor(Math.max(24, Math.min(54, (window.innerWidth - 32) / 10.2))) + 'px');
+}
+// The hint panel floats just above the keyboard. A top-level page measures the keyboard through visualViewport; inside
+// claude.ai's frame the keyboard is invisible to the page, so assume it covers the lower part of the screen.
+function rePlace() { if (typeof kbFloat !== 'undefined' && kbFloat) placeHint(); }   // typing line / hint panel changed size
+function showRaw() { showRaw0(); rePlace(); }
+function showCellAlts() { showCellAlts0(); rePlace(); }
+function updateHintBar(cw) { updateHintBar0(cw); rePlace(); }
+function placeHint() {
+  const root = document.documentElement.style, hb = $('hintbar'), ty = $('typing'); if (!hb) return;
+  if (!kbOn || !kbFloat) { for (const k of ['--hy', '--hb', '--ty', '--tb']) root.removeProperty(k); return; }
+  const th = ty && ty.textContent ? ty.offsetHeight : 0, hh = hb.offsetHeight;
+  const vv = window.visualViewport; let framed = false; try { framed = window.self !== window.top; } catch (e) { framed = true; }
+  if (framed && (!vv || vv.height >= window.innerHeight - 2) && window.screen && screen.height) {
+    const hy = Math.max(60, Math.round(Math.min(window.innerHeight, screen.height * 0.36) - hh - 4));
+    root.setProperty('--hb', 'auto'); root.setProperty('--hy', hy + 'px');
+    root.setProperty('--tb', 'auto'); root.setProperty('--ty', Math.max(40, hy - th - 6) + 'px');
+  } else {
+    const gap = vv ? Math.max(0, Math.round(window.innerHeight - vv.offsetTop - vv.height)) : 0;
+    root.setProperty('--hy', 'auto'); root.setProperty('--hb', (gap + 4) + 'px');
+    root.setProperty('--ty', 'auto'); root.setProperty('--tb', (gap + 4 + hh + 6) + 'px');
+  }
+}
+// start the view at the first cell of the active word, just under the cursor buttons
+let scrollT = 0;
+function scrollToWord() {
+  if (!kbOn) return;
+  placeHint();
+  const pd = $('pad'); const w = curWord(); const first = w ? w.cells[0] : [sel.r, sel.c];
+  const el = $('in' + first[0] + '_' + first[1]); if (!el) return;
+  const y = el.getBoundingClientRect().top + window.pageYOffset - ((pd ? pd.offsetHeight : 0) + 8);
+  window.scrollTo({top: Math.max(0, y), behavior: 'auto'});
+}
+function scheduleScroll() { clearTimeout(scrollT); scrollT = setTimeout(scrollToWord, 60); setTimeout(scrollToWord, 400); }
+// floating = hint panel and letter options pinned above the keyboard; dropped (back into the page flow, no layout jump) when the player scrolls
+let kbFloat = false;
+function setFloat(on) { kbFloat = on; document.body.classList.toggle('kbfloat', on); placeHint(); }
+function setKb(on) {
+  if (kbOn === on) { if (on) fitBoard(); return; }
+  kbOn = on; document.body.classList.toggle('kb', on); setFloat(on); fitBoard();
+  if (on) setTimeout(() => { fitBoard(); scheduleScroll(); }, 60);
+}
+document.addEventListener('focusin', e => {
+  const t = e.target;
+  if (t && t.matches && t.matches('.cell input') && narrowScreen()) { clearTimeout(kbTimer); enterKb(); }
+});
+// the keyboard can be closed without the cell losing focus, and the page cannot see that inside claude.ai's frame:
+// treat the player scrolling the page, or tapping a cell again, as the signal (scrolled away: hint panel goes back below the grid)
+// the layout must not change while the finger is still down on the cell, or the tap is lost and the keyboard needs a second tap
+let touchY = 0, enterT = 0;
+// keyboard put away: back to the normal layout and scroll down so the hint panel (now under the grid) is in view
+function leaveKb() {
+  clearTimeout(enterT); clearTimeout(kbTimer); setKb(false);
+  setTimeout(() => { const hb = $('hintbar'); if (hb && narrowScreen()) { try { hb.scrollIntoView({block: 'end', behavior: 'smooth'}); } catch (e) { hb.scrollIntoView(false); } } }, 120);
+}
+let vvShrunk = false;
+function enterKb() { clearTimeout(enterT); enterT = setTimeout(() => { if (!kbOn) setKb(true); else if (!kbFloat) setFloat(true); scheduleScroll(); }, 220); }
+document.addEventListener('touchstart', e => { touchY = e.touches && e.touches[0] ? e.touches[0].clientY : 0; }, {passive: true});
+document.addEventListener('touchmove', e => {
+  const y = e.touches && e.touches[0] ? e.touches[0].clientY : touchY;
+  if (kbOn && kbFloat && Math.abs(y - touchY) > 14) { clearTimeout(kbTimer); clearTimeout(enterT); setFloat(false); }
+}, {passive: true});
+document.addEventListener('pointerup', e => {
+  const t = e.target; if (t && t.closest && t.closest('.cell') && narrowScreen() && !(kbOn && kbFloat)) enterKb();
+});
+document.addEventListener('focusout', e => {
+  if (!(e.target && e.target.matches && e.target.matches('.cell input'))) return;
+  clearTimeout(kbTimer);
+  kbTimer = setTimeout(() => { const a = document.activeElement; if (!(a && a.matches && a.matches('.cell input'))) leaveKb(); }, 350);
+});
+window.addEventListener('resize', () => { if (kbOn && !narrowScreen()) setKb(false); else fitBoard(); });
+if (window.visualViewport) window.visualViewport.addEventListener('resize', () => {
+  const vv = window.visualViewport, shrunk = vv.height < window.innerHeight - 80;
+  if (kbOn && vvShrunk && !shrunk) { vvShrunk = false; leaveKb(); return; }   // top-level page: the keyboard just went down
+  vvShrunk = shrunk; fitBoard(); scheduleScroll();
+});
+
+/* ---------- on-screen cursor buttons (phones) ---------- */
+document.querySelectorAll('#pad button').forEach(b => {
+  b.addEventListener('pointerdown', ev => ev.preventDefault());   // keep the cell focused so the keyboard stays open
+  b.addEventListener('click', () => {
+    const el = $('in' + sel.r + '_' + sel.c); const k = b.dataset.k;
+    if (k === 'B' && raw && useBuiltin) { if (el) popRaw(el); return; }
+    if (commitRaw()) return;
+    if (k === 'L') moveH(-1); else if (k === 'R') moveH(1); else if (k === 'U') moveV(-1); else if (k === 'D') moveV(1);
+    else if (k === 'S') onSpace(); else if (k === 'E') onEnter(); else if (k === 'B') onBackspace($('in' + sel.r + '_' + sel.c) || el);
+  });
+});
+
+/* ---------- progress tracking (db + user capabilities; page works without them) ---------- */
+const PID = (BASE.date || 'p');
+const freshStats = () => ({name: '', startedAt: 0, lastAt: 0, activeSec: 0, filled: 0, correct: 0, total: 0, wordsTotal: 0, wordsDone: 0,
+  wordSec: {}, revealCell: 0, revealWord: 0, revealAll: 0, checks: 0, done: false, doneAt: 0, revealedWords: [], entries: null});
+let st = freshStats(), dbRef = null, docExists = false, trackState = 'pending', saving = false, again = false, dirty = false;
+let saveTimer = 0, lastActive = 0, userNs = null, dbNs = null;
+try { const ls = JSON.parse(localStorage.getItem(KEY) || 'null'); if (ls && ls.stats && ls.stats.startedAt) st = Object.assign(freshStats(), ls.stats); } catch (e) {}
+let pname = ''; try { pname = localStorage.getItem('tp-name') || ''; } catch (e) {}
+if (!pname && st.name) pname = st.name;
+function showPlayer() { const pl = $('playerLine'); pl.textContent = ''; pl.hidden = !pname; if (!pname) return; const b = document.createElement('b'); b.textContent = pname; pl.append('ఆడుతున్నవారు: ', b); }
+showPlayer();
+function saveName() {
+  const v = $('nameIn').value.trim().slice(0, 40);
+  if (!v) return;   // a blank box keeps the current name
+  pname = v; try { localStorage.setItem('tp-name', pname); } catch (e) {}
+  st.name = pname; dirty = true; scheduleSave(500); save();
+  $('nameIn').value = ''; showPlayer(); $('nameMsg').textContent = 'సేవ్ అయింది';
+}
+$('nameOk').onclick = saveName;
+$('nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveName(); } });
+$('nameIn').addEventListener('blur', () => { if ($('nameIn').value.trim()) saveName(); });
+
+/* congratulations screen, shown once when the last word is finished */
+function winTime(sec) { sec = Math.max(1, Math.round(sec || 0)); const m = Math.floor(sec / 60), r = sec % 60; return (m ? m + ' నిమిషాలు ' : '') + r + ' సెకన్లు'; }
+function showWin() {
+  if (mode !== 'solve' || !W.every(wordDone) || document.getElementById('winOv')) return;
+  try { const a = document.activeElement; if (a && a.blur) a.blur(); leaveKb(); } catch (e) {}
+  const help = st.revealCell + st.revealWord + st.revealAll;
+  const ov = document.createElement('div'); ov.className = 'winov'; ov.id = 'winOv'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+  ov.innerHTML = '<div class="winbox"><div class="big">🎉</div><h2></h2><p>పదకేళి పూర్తి చేశారు!</p><div class="tm"></div><p>పట్టిన సమయం</p><p class="hp"></p>'
+    + '<div class="row"><button type="button" class="primary" id="winCopy">ఫలితం కాపీ చేయి</button><button type="button" id="winClose">మూసివేయి</button></div></div>';
+  ov.querySelector('h2').textContent = 'అభినందనలు' + (pname ? ', ' + pname : '') + '!';
+  ov.querySelector('.tm').textContent = winTime(st.activeSec);
+  ov.querySelector('.hp').textContent = help ? 'సహాయం వాడిన సార్లు: ' + help : 'సహాయం లేకుండానే పూర్తి చేశారు 👏';
+  document.body.appendChild(ov);
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+  ov.querySelector('#winClose').onclick = close;
+  ov.addEventListener('click', e => { if (e.target === ov) close(); });
+  ov.querySelector('#winCopy').onclick = () => { $('shareBtn').click(); ov.querySelector('#winCopy').textContent = 'కాపీ అయింది ✓'; };
+  ov.querySelector('#winClose').focus();
+}
+function resultText() {
+  const m = fmtMin(st.activeSec);
+  return ['తెలుగు పదకేళి ' + PID, 'పేరు: ' + (pname || '-'), 'సరైన గడులు: ' + st.correct + '/' + st.total, 'పదాలు: ' + st.wordsDone + '/' + st.wordsTotal,
+    'సమయం: ' + winTime(st.activeSec), 'సహాయం (అక్షరం/పదం/అన్నీ): ' + st.revealCell + '/' + st.revealWord + '/' + st.revealAll, 'తనిఖీలు: ' + st.checks, 'పూర్తి: ' + (st.done ? 'అవును' : 'కాదు')].join('\n');
+}
+$('shareBtn').onclick = async () => {
+  const t = resultText(); const box = $('resultBox'), ta = $('resultText');
+  try { await navigator.clipboard.writeText(t); box.hidden = true; $('nameMsg').textContent = 'ఫలితం కాపీ అయింది'; }
+  catch (e) { ta.value = t; box.hidden = false; ta.focus(); ta.select(); }
+};
+function setTrack(state) {
+  trackState = state; const t = $('track'); t.className = 'track ' + (state === 'on' ? 'on' : state === 'off' ? 'off' : '');
+  t.textContent = state === 'on' ? 'ప్రోగ్రెస్ నమోదు: ఆన్'
+    : state === 'off' ? 'ప్రోగ్రెస్ ఈ పరికరంలోనే ఉంటుంది. నిర్వాహకులకు పంపాలంటే "ఫలితం కాపీ చేయి" నొక్కి పంపండి.'
+    : 'ప్రోగ్రెస్ నమోదు: తనిఖీ చేస్తోంది…';
+}
+function noteActive(force) {
+  const now = Date.now(); lastActive = now; if (!st.startedAt) st.startedAt = now; st.lastAt = now; dirty = true; scheduleSave(force ? 1500 : 6000);
+}
+function scheduleSave(ms) { if (trackState !== 'on') return; clearTimeout(saveTimer); saveTimer = setTimeout(flush, ms); }
+function trackProgress(allDone) {
+  let filled = 0, correct = 0, total = 0;
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { if (ans(r, c) === BLACK) continue; total++; const e = clean(entries[r][c]); if (e) { filled++; if (e === clean(ans(r, c))) correct++; } }
+  const wd = W.filter(wordDone).length; let changed = false;
+  if (st.filled !== filled || st.correct !== correct || st.total !== total || st.wordsDone !== wd || st.wordsTotal !== W.length) { st.filled = filled; st.correct = correct; st.total = total; st.wordsDone = wd; st.wordsTotal = W.length; changed = true; }
+  W.forEach(w => { const k = w.num + w.dir; if (wordDone(w) && st.startedAt && st.wordSec[k] === undefined) { st.wordSec[k] = Math.round((Date.now() - st.startedAt) / 1000); changed = true; } });
+  if (allDone && !st.done) { st.done = true; st.doneAt = Date.now(); changed = true; scheduleSave(500); }
+  if (changed && st.startedAt) { dirty = true; scheduleSave(6000); }
+}
+const ENDPOINT = PUZZLE_ENDPOINT;   // paste your Google Apps Script web-app URL here (see APPS_SCRIPT_SETUP.md); leave empty to disable
+let uid = ''; try { uid = localStorage.getItem('tp-uid') || ''; if (!uid) { uid = 'p' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); localStorage.setItem('tp-uid', uid); } } catch (e) { uid = 'p' + Math.random().toString(36).slice(2, 10); }
+async function flush() {
+  if (trackState !== 'on' || !ENDPOINT || !dirty) return;
+  if (saving) { again = true; return; }
+  saving = true; dirty = false;
+  try {
+    const body = {id: uid, puzzle: PID, name: pname, correct: st.correct, total: st.total, wordsDone: st.wordsDone, wordsTotal: st.wordsTotal, activeSec: st.activeSec,
+      revealCell: st.revealCell, revealWord: st.revealWord, revealAll: st.revealAll, checks: st.checks, done: st.done, doneAt: st.doneAt, startedAt: st.startedAt, lastAt: st.lastAt,
+      revealedWords: st.revealedWords, wordSec: st.wordSec};
+    await fetch(ENDPOINT, {method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify(body)});
+  } catch (e) { /* offline: the next change tries again */ dirty = true; }
+  saving = false; if (again) { again = false; dirty = true; flush(); }
+}
+setInterval(() => {
+  if (document.hidden || !st.startedAt) return;
+  if (Date.now() - lastActive < 30000) { st.activeSec += 5; dirty = true; if (st.activeSec % 30 === 0) { scheduleSave(500); save(); } }
+}, 5000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+window.addEventListener('pagehide', () => { flush(); });
+
+function initTracking() { setTrack(ENDPOINT ? 'on' : 'off'); }
+function fmtMin(sec) { sec = Math.round(sec || 0); const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); }
+
+$('title').textContent = puzzle.title; $('meta').textContent = puzzle.date + ' · 10×10 · ప్రతి గడిలో ఒక అక్షరం';
+setMode('solve');
+{ const w0 = W.find(w => w.dir === 'A') || W[0]; if (w0) { const [r0, c0] = firstOpen(w0); sel = {r: r0, c: c0, dir: w0.dir}; paint(); } if (!window.matchMedia('(pointer: coarse)').matches) focusCell(sel.r, sel.c); }
+initTracking();
+if (st.done) $('doneBanner').hidden = false;
+</script>
+
+</body>
+</html>
