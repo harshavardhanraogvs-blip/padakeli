@@ -623,7 +623,7 @@ const SWAP = {
   n: ['N', 'ny'], N: ['n', 'ny'], ny: ['n', 'N'], l: ['L'], L: ['l'],
   s: ['S', 'sh'], S: ['s', 'sh'], sh: ['s', 'S'], v: ['w'], w: ['v']
 };
-const VSWAP = {a: ['aa', 'ee'], aa: ['a'], i: ['ii', 'ee'], ii: ['i', 'ee'], u: ['uu', 'oo'], uu: ['u', 'oo'], e: ['ee'], ee: ['e', 'ii', 'i'], o: ['oo'], oo: ['o', 'uu', 'u']};
+const VSWAP = {a: ['aa', 'ee'], aa: ['a'], i: ['ii', 'ee'], ii: ['i', 'ee'], u: ['uu', 'oo', 'a'], uu: ['u', 'oo'], e: ['ee'], ee: ['e', 'ii', 'i'], o: ['oo'], oo: ['o', 'uu', 'u']};
 let altRaws = [];
 const rawStore = {};   // "r,c" -> {raw, val}: what was typed for a cell, so other spellings can be offered later
 // every Telugu form an akshara could be typed as (any alternative letter in any position)
@@ -732,14 +732,40 @@ function advance() {   // next open cell along the active word, or the next unfi
 }
 // A whole word typed while its first cells are already filled and the cursor sits on the first empty one (so the typed text
 // begins with the word's own first letter): start from the word's first cell, the filled ones take their letters again.
-function rewindStart(r, c, forms) {
-  if (mode !== 'solve' || !forms || !forms.length) return null;
+function rewindStart(r, c, items, formsOf) {
+  if (mode !== 'solve' || !items || !items.length) return null;
   const w = curWord(); if (!w) return null;
   const i = w.cells.findIndex(([a, b]) => a === r && b === c);
   if (i <= 0 || !isOpen(r, c)) return null;
   for (let j = 0; j < i; j++) if (isOpen(w.cells[j][0], w.cells[j][1])) return null;
-  const a0 = clean(ans(w.cells[0][0], w.cells[0][1])), ai = clean(ans(r, c));
-  return forms.includes(a0) && !forms.includes(ai) ? w.cells[0] : null;
+  // does the typed list fit the word from cell k on (every piece the right letter, none left over)?
+  const fit = k => items.length <= w.cells.length - k && items.every((it, t) => formsOf(it).includes(clean(ans(w.cells[k + t][0], w.cells[k + t][1]))));
+  return fit(i) ? null : (fit(0) ? w.cells[0] : null);
+}
+// typed one letter at a time: the pieces typed so far in this word, to tell "the rest of the word" from "the whole word again"
+let stream = null;
+function streamSwitch(r0, c0, chunk) {
+  if (mode !== 'solve') return false;
+  const w = curWord(); if (!w) return false;
+  const n = w.cells.length, i = w.cells.findIndex(([a, b]) => a === r0 && b === c0); if (i < 0) return false;
+  const now = Date.now(), key = w.num + w.dir;
+  if (!stream || stream.key !== key || now - stream.at > 4000 || stream.next !== i) stream = {key, chunks: [], at: [], opened: w.cells.map(([a, b]) => isOpen(a, b))};
+  stream.chunks.push(chunk); stream.at = now; stream.next = i + 1; (stream.cells = stream.cells || []).push(i);
+  const ch = stream.chunks, j = ch.length - 1;
+  const fitsCell = (x, k) => k < n && allForms(x).includes(clean(ans(w.cells[k][0], w.cells[k][1])));
+  if (fitsCell(chunk, i)) return false;                       // it is the right letter for this cell: carry on
+  for (let s = 0; s <= j; s++) {
+    const sub = ch.slice(s), L = sub.length;
+    if (L > n || !sub.every((x, t) => fitsCell(x, t))) continue;
+    if (L === 1 && w.cells.slice(0, i).some(([a, b]) => isOpen(a, b))) continue;   // a lone piece is a restart only if everything before the cursor is filled, otherwise it is a typo
+    // the pieces from s on are the whole word typed again: clear what they put in the wrong cells, then write them from the first cell
+    for (let t = s; t < j; t++) { const k = stream.cells[t], [a, b] = w.cells[k]; if (stream.opened[k] && !isLocked(a, b)) setVal(a, b, ''); }
+    fillWordRaw(w.cells[0][0], w.cells[0][1], null, sub.slice());
+    const e0 = $('in' + r0 + '_' + c0); if (e0) e0.value = clean(entries[r0][c0]) || '';
+    stream.chunks = sub.slice(); stream.cells = sub.map((x, t) => t); stream.next = L;
+    return true;
+  }
+  return false;
 }
 function putAk(r, c, rawAk) {
   lastAuto = null;
@@ -768,9 +794,8 @@ function pushRaw(el, k) {
     const sp = splitStep(raw, k);
     if (sp) {   // the new letter starts the next akshara: settle this cell and move on
       const r0 = rawPos.r, c0 = rawPos.c; raw = ''; showRaw();
-      let tr = r0, tc = c0; const rw = rewindStart(r0, c0, allForms(sp.firstRaw));
-      if (rw) { const e0 = $('in' + r0 + '_' + c0); if (e0) e0.value = ''; tr = rw[0]; tc = rw[1]; sel = {r: tr, c: tc, dir: sel.dir}; }
-      const replay = putAk(tr, tc, sp.firstRaw); if (!jumped) advance();
+      let replay = '';
+      if (!streamSwitch(r0, c0, sp.firstRaw)) { replay = putAk(r0, c0, sp.firstRaw); if (!jumped) advance(); }
       const ne = $('in' + sel.r + '_' + sel.c);
       if (ne && ne !== el) { rawPos = {r: sel.r, c: sel.c}; rawPrev = ne.value; raw = (replay || '') + sp.rest; pushRaw(ne, k); return; }
     }
@@ -800,7 +825,8 @@ function commitRaw(fromBlur) {
   if (!raw || !rawPos) return false;
   clearTimeout(autoTimer);
   const {r, c} = rawPos, rw = raw; raw = ''; showRaw();
-  const replay = putAk(r, c, rw);
+  let replay = ''; if (!streamSwitch(r, c, rw)) replay = putAk(r, c, rw);
+  stream = null;   // typing stopped here: the next letters start a new run
   if (replay && !fromBlur && !jumped) {   // typed on a correct cell but meant for the next open one
     advance();
     const ne = $('in' + sel.r + '_' + sel.c);
@@ -809,10 +835,10 @@ function commitRaw(fromBlur) {
   return false;
 }
 // a whole English word typed or pasted: one akshara per cell along the active word
-function fillWordRaw(r, c, word) {
+function fillWordRaw(r, c, word, listOverride) {
   lastAuto = null;
-  const list = rawList(word), [dr, dc] = dvec();
-  const rw = list.length ? rewindStart(r, c, allForms(list[0])) : null; if (rw) { r = rw[0]; c = rw[1]; }
+  const list = listOverride || rawList(word), [dr, dc] = dvec();
+  const rw = !listOverride && list.length ? rewindStart(r, c, list, x => allForms(x)) : null; if (rw) { r = rw[0]; c = rw[1]; }
   { let n = 0, a = r, b = c; while (white(a, b)) { n++; a += dr; b += dc; }   // more pieces than cells left, ending in a lone n/m: it is the anusvara of the one before (ran -> రం)
     if (list.length > n && list.length > 1 && /^[nm]$/.test(list[list.length - 1])) { const m = list.pop(); list[list.length - 1] += 'M'; } }
   let rr = r, cc = c, last = null, i = 0;
@@ -910,7 +936,7 @@ let lastIn = {key: '', t: 0};
 // One akshara goes in its own cell. Several (a typed or pasted word) fill the following cells along the active word,
 // across or down.
 function applyParts(r, c, parts, adv) {
-  const rw = parts.length > 1 ? rewindStart(r, c, [clean(parts[0])]) : null; if (rw) { r = rw[0]; c = rw[1]; }
+  const rw = parts.length > 1 ? rewindStart(r, c, parts, x => [clean(x)]) : null; if (rw) { r = rw[0]; c = rw[1]; }
   const [dr, dc] = dvec(); let rr = r, cc = c, last = null, i = 0;
   while (i < parts.length && white(rr, cc)) {
     if (mode === 'solve' && isLocked(rr, cc)) {
