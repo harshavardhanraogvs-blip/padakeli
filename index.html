@@ -1198,7 +1198,20 @@ function scrollToWord() {
   placeHint();
   const pd = $('pad'); const w = curWord(); const first = w ? w.cells[0] : [sel.r, sel.c];
   const el = $('in' + first[0] + '_' + first[1]); if (!el) return;
-  const y = el.getBoundingClientRect().top + window.pageYOffset - ((pd ? pd.offsetHeight : 0) + 8);
+  let y = el.getBoundingClientRect().top + window.pageYOffset - ((pd ? pd.offsetHeight : 0) + 8);
+  // do not scroll further than needed: a word near the bottom of the grid would leave a blank gap above the hint panel
+  // and hide the rest of the grid, so keep the bottom of the grid (and the buttons under it) just above the floating panels
+  const bd = $('board'), tl = document.querySelector('.tools');
+  if (bd) {
+    let limit = window.innerHeight;
+    if (kbFloat) {
+      const hb = $('hintbar'), ty = $('typing');
+      limit = Math.min(limit, hb.getBoundingClientRect().top - 8);
+      if (ty && ty.textContent) limit = Math.min(limit, ty.getBoundingClientRect().top - 6);
+    }
+    const bottomDoc = (tl ? tl.getBoundingClientRect().bottom : bd.getBoundingClientRect().bottom) + window.pageYOffset;
+    y = Math.min(y, bottomDoc - limit);
+  }
   window.scrollTo({top: Math.max(0, y), behavior: 'auto'});
 }
 function scheduleScroll() { clearTimeout(scrollT); scrollT = setTimeout(scrollToWord, 60); setTimeout(scrollToWord, 400); }
