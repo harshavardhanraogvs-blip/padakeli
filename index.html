@@ -734,10 +734,25 @@ function rawList(word) {
   return list;
 }
 const dvec = () => sel.dir === 'D' ? [1, 0] : [0, 1];
+// Cells already correct are skipped: the cursor goes to the next cell that still needs a letter. The skipped cells are remembered for a moment:
+// a player who types the whole word, including the letters of the cells that were skipped, is taken back to them so those letters are absorbed.
+let skipMem = null;
 function advance() {   // next open cell along the active word, or the next unfinished word
-  const [dr, dc] = dvec(), r = sel.r + dr, c = sel.c + dc;
-  if (white(r, c)) gotoCell(r, c, sel.dir); else goNextWord(curWord());
+  if (skipSwallow) { skipSwallow = false; return; }
+  const [dr, dc] = dvec(); let r = sel.r + dr, c = sel.c + dc; const skipped = [];
+  while (mode === 'solve' && white(r, c) && (isLocked(r, c) || (clean(entries[r][c]) && clean(entries[r][c]) === clean(ans(r, c))))) { skipped.push([r, c]); r += dr; c += dc; }   // correct cells, whether or not their word is finished
+  skipMem = null;
+  if (white(r, c)) { if (skipped.length) skipMem = {cells: skipped, at: [r, c], t: Date.now()}; gotoCell(r, c, sel.dir); } else goNextWord(curWord());
 }
+// An akshara that is not the letter of the cell the cursor is on, but is the letter of a skipped (already correct) cell: the player is typing the whole
+// word, so it belongs to that skipped cell. Returns that cell, or null.
+function skipRedirect(r, c, val) {
+  const m = skipMem; if (!m || mode !== 'solve' || !m.cells.length) return null;
+  if (Date.now() - m.t > 5000 || m.at[0] !== r || m.at[1] !== c) { skipMem = null; return null; }
+  const [sr, sc] = m.cells[0];
+  return val && val !== clean(ans(r, c)) && val === clean(ans(sr, sc)) ? m.cells[0] : null;
+}
+let skipSwallow = false;   // the akshara just settled went to a skipped cell: the cursor stays where it is
 // A whole word typed while its first cells are already filled and the cursor sits on the first empty one (so the typed text
 // begins with the word's own first letter): start from the word's first cell, the filled ones take their letters again.
 function rewindStart(r, c, items, formsOf) {
@@ -754,6 +769,7 @@ function rewindStart(r, c, items, formsOf) {
 let stream = null;
 function streamSwitch(r0, c0, chunk) {
   if (mode !== 'solve') return false;
+  if (skipMem && skipMem.cells.length && skipMem.at[0] === r0 && skipMem.at[1] === c0 && Date.now() - skipMem.t < 5000) return false;   // the cursor just skipped correct cells: the skip logic places the letters
   const w = curWord(); if (!w) return false;
   const n = w.cells.length, i = w.cells.findIndex(([a, b]) => a === r0 && b === c0); if (i < 0) return false;
   const now = Date.now(), key = w.num + w.dir;
@@ -777,6 +793,10 @@ function streamSwitch(r0, c0, chunk) {
 }
 function putAk(r, c, rawAk) {
   lastAuto = null;
+  if (mode === 'solve' && skipMem) {
+    const res = resolveAk(rawAk, r, c), tgt = skipRedirect(r, c, res !== clean(ans(r, c)) ? res : clean(translit(rawAk)));   // 'ka' is adapted to the cell (కా) but as typed it is క: the letter of a skipped cell
+    if (tgt) { skipMem.cells.shift(); skipMem.t = Date.now(); skipSwallow = true; Promise.resolve().then(() => { skipSwallow = false; }); const el0 = $('in' + r + '_' + c); if (el0) el0.value = entries[r][c] || ''; return ''; }
+  }
   if (mode === 'solve' && isLocked(r, c)) {
     // the cursor is on a cell that is already correct: typing its own letter just moves on; anything else belongs to the next open cell
     const el0 = $('in' + r + '_' + c); if (el0) el0.value = entries[r][c] || '';
@@ -973,6 +993,16 @@ function onInputCore(e) {
         const rest = comb.slice(1);
         if (rest.length && !jumped) applyParts(r, c, rest, true);
         return;
+      }
+    }
+  }
+  if (mode === 'solve' && skipMem) {
+    const tgt = skipRedirect(r, c, clean(parts[0]));
+    if (tgt && parts.length === 1) { el.value = stored || ''; skipMem.cells.shift(); skipMem.t = Date.now(); return; }
+    if (skipMem && skipMem.cells.length && parts.length === 1) {   // the first character of a skipped cell's akshara (క of కా), the rest follows character by character
+      const t0 = clean(parts[0]), la = clean(ans(skipMem.cells[0][0], skipMem.cells[0][1])), cu = clean(ans(r, c));
+      if (t0 && la.length > t0.length && la.startsWith(t0) && !cu.startsWith(t0)) {
+        el.value = stored || ''; lockedPending = {rest: la.slice(t0.length), t: Date.now()}; skipMem.cells.shift(); skipMem.t = Date.now(); return;
       }
     }
   }
