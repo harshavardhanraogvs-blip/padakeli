@@ -648,6 +648,7 @@ function allForms(r0) {
   const n = toks.length, last = toks[n - 1];
   if (n >= 2 && last.t === 'c' && (last.v === 'న' || last.v === 'మ') && toks[n - 2].t === 'v')   // a closing n/m can be the anusvara: pan -> పం
     forms.push(...combos.map(c => translit(c.slice(0, -1).join('')) + 'ం'));
+  if (toks.some(tk => tk.t === 'c' && tk.src === 'ny')) forms.push(...forms.filter(x => x.includes('ఞ')).map(x => x.replace('ఞ', 'న్య')));   // nyaa can be న్యా (న్యాయం) as well as ఞా
   return [...new Set(forms)];
 }
 // while solving, if what was typed could be the cell's own letter (న/ణ, ర/రా, ద/డ ...), the cell's letter goes in
