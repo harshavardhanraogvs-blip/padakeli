@@ -735,23 +735,38 @@ function rawList(word) {
   return list;
 }
 const dvec = () => sel.dir === 'D' ? [1, 0] : [0, 1];
-// Cells already correct are skipped: the cursor goes to the next cell that still needs a letter. The skipped cells are remembered for a moment:
-// a player who types the whole word, including the letters of the cells that were skipped, is taken back to them so those letters are absorbed.
-let skipMem = null;
-function advance() {   // next open cell along the active word, or the next unfinished word
+// While typing, the cursor moves cell by cell as always (a correct cell swallows its own letter). When typing pauses and the cursor is resting on a cell
+// that is already correct, it moves on to the next cell that still needs a letter. The cells it passed are remembered for a moment: a player who then types
+// the whole word, including the letters of those cells, has them absorbed instead of pushed into the next open cell.
+let skipMem = null, lastKeyAt = 0, idleTimer = 0;
+const isRight = (r, c) => !!clean(entries[r][c]) && clean(entries[r][c]) === clean(ans(r, c));
+function advance() {   // next cell along the active word, or the next unfinished word
   if (skipSwallow) { skipSwallow = false; return; }
-  const [dr, dc] = dvec(); let r = sel.r + dr, c = sel.c + dc; const skipped = [];
-  while (mode === 'solve' && white(r, c) && (isLocked(r, c) || (clean(entries[r][c]) && clean(entries[r][c]) === clean(ans(r, c))))) { skipped.push([r, c]); r += dr; c += dc; }   // correct cells, whether or not their word is finished
+  const [dr, dc] = dvec(), r = sel.r + dr, c = sel.c + dc;
   skipMem = null;
-  if (white(r, c)) { if (skipped.length) skipMem = {cells: skipped, at: [r, c], t: Date.now()}; gotoCell(r, c, sel.dir); } else goNextWord(curWord());
+  if (white(r, c)) gotoCell(r, c, sel.dir); else goNextWord(curWord());
+  armIdle();
+}
+function armIdle() {
+  clearTimeout(idleTimer); if (mode !== 'solve') return;
+  const at = {r: sel.r, c: sel.c};
+  idleTimer = setTimeout(() => idleSkip(at), 750);
+}
+function idleSkip(at) {
+  if (mode !== 'solve' || raw || sel.r !== at.r || sel.c !== at.c || !isRight(at.r, at.c)) return;
+  if (Date.now() - lastKeyAt < 700) { armIdle(); return; }
+  const [dr, dc] = dvec(), skipped = [[at.r, at.c]]; let r = at.r + dr, c = at.c + dc;
+  while (white(r, c) && isRight(r, c)) { skipped.push([r, c]); r += dr; c += dc; }
+  if (white(r, c)) { skipMem = {cells: skipped, at: [r, c], t: Date.now()}; gotoCell(r, c, sel.dir); } else goNextWord(curWord());
 }
 // An akshara that is not the letter of the cell the cursor is on, but is the letter of a skipped (already correct) cell: the player is typing the whole
 // word, so it belongs to that skipped cell. Returns that cell, or null.
-function skipRedirect(r, c, val) {
+function skipRedirect(r, c, forms, plain) {   // forms: every Telugu letter what was typed could be; plain: it read literally
   const m = skipMem; if (!m || mode !== 'solve' || !m.cells.length) return null;
   if (Date.now() - m.t > 5000 || m.at[0] !== r || m.at[1] !== c) { skipMem = null; return null; }
-  const [sr, sc] = m.cells[0];
-  return val && val !== clean(ans(r, c)) && val === clean(ans(sr, sc)) ? m.cells[0] : null;
+  const [sr, sc] = m.cells[0], la = clean(ans(sr, sc)), cu = clean(ans(r, c));
+  if (!la || !forms.includes(la)) return null;
+  return !forms.includes(cu) || (plain === la && plain !== cu) ? m.cells[0] : null;
 }
 let skipSwallow = false;   // the akshara just settled went to a skipped cell: the cursor stays where it is
 // A whole word typed while its first cells are already filled and the cursor sits on the first empty one (so the typed text
@@ -795,7 +810,7 @@ function streamSwitch(r0, c0, chunk) {
 function putAk(r, c, rawAk) {
   lastAuto = null;
   if (mode === 'solve' && skipMem) {
-    const res = resolveAk(rawAk, r, c), tgt = skipRedirect(r, c, res !== clean(ans(r, c)) ? res : clean(translit(rawAk)));   // 'ka' is adapted to the cell (కా) but as typed it is క: the letter of a skipped cell
+    const tgt = skipRedirect(r, c, allForms(rawAk), clean(translit(rawAk)));
     if (tgt) { skipMem.cells.shift(); skipMem.t = Date.now(); skipSwallow = true; Promise.resolve().then(() => { skipSwallow = false; }); const el0 = $('in' + r + '_' + c); if (el0) el0.value = entries[r][c] || ''; return ''; }
   }
   if (mode === 'solve' && isLocked(r, c)) {
@@ -833,6 +848,7 @@ function tailLetter(k) {
   releaseTail(); return false;
 }
 function pushRaw(el, k) {
+  lastKeyAt = Date.now();
   const cell = el.parentElement; const pos = {r: +cell.dataset.r, c: +cell.dataset.c};
   if (lastAuto && !raw && Date.now() - lastAuto.t < 2500) {
     const la = lastAuto; lastAuto = null;
@@ -945,6 +961,7 @@ function onInput(e) {
   }
 }
 function onInputCore(e) {
+  lastKeyAt = Date.now();
   if (e.isComposing) return;
   if (!(e.inputType === 'insertText' && e.data && /^[A-Za-z]$/.test(e.data))) lastAuto = null;
   const el = e.target; const cell = el.parentElement; const r = +cell.dataset.r, c = +cell.dataset.c;
@@ -963,7 +980,10 @@ function onInputCore(e) {
   const typed = e.data ? e.data : el.value;
   if (typed.includes('#') && mode === 'edit') { el.value = ans(r, c); toggleBlack(); return; }
   const latin = clean(typed);
-  if (useBuiltin && /^[A-Za-z]+$/.test(latin)) { fillWordRaw(r, c, latin.length > 1 && latin === latin.toUpperCase() ? latin.toLowerCase() : latin[0].toLowerCase() + latin.slice(1)); return; }   // pasted or composed English word
+  if (useBuiltin && /^[A-Za-z]+$/.test(latin)) {
+    const nowL = Date.now(); if (lastLatin.w === latin && nowL - lastLatin.t < 200) return;   // compositionend and the input that follows it both report the same word
+    lastLatin = {w: latin, t: nowL}; fillWordRaw(r, c, latin.length > 1 && latin === latin.toUpperCase() ? latin.toLowerCase() : latin[0].toLowerCase() + latin.slice(1)); return;
+  }   // pasted or composed English word
   if (e.data === ' ' && /\s$/.test(el.value)) {   // space typed on a soft keyboard: commit the letter and move on
     if (Date.now() - lastAdvAt < 600) { el.value = (mode === 'edit' ? puzzle.grid[r][c] : entries[r][c]) || ''; return; }   // the keyboard's own space after a word we already moved on from
     const t = el.value.replace(/\s+$/, ''); el.value = t;
@@ -998,7 +1018,7 @@ function onInputCore(e) {
     }
   }
   if (mode === 'solve' && skipMem) {
-    const tgt = skipRedirect(r, c, clean(parts[0]));
+    const tgt = skipRedirect(r, c, [clean(parts[0])], clean(parts[0]));
     if (tgt && parts.length === 1) { el.value = stored || ''; skipMem.cells.shift(); skipMem.t = Date.now(); return; }
     if (skipMem && skipMem.cells.length && parts.length === 1) {   // the first character of a skipped cell's akshara (క of కా), the rest follows character by character
       const t0 = clean(parts[0]), la = clean(ans(skipMem.cells[0][0], skipMem.cells[0][1])), cu = clean(ans(r, c));
@@ -1010,7 +1030,7 @@ function onInputCore(e) {
   applyParts(r, c, parts, true);
 }
 let lastPut = null, lockedPending = null, lastAdvAt = 0;
-let lastIn = {key: '', t: 0};
+let lastIn = {key: '', t: 0}, lastLatin = {w: '', t: 0};
 // One akshara goes in its own cell. Several (a typed or pasted word) fill the following cells along the active word,
 // across or down.
 function applyParts(r, c, parts, adv) {
