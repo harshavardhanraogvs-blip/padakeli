@@ -1110,7 +1110,10 @@ function rowEdge(end) {
   if (end) { for (let c = N - 1; c >= 0; c--) if (white(r, c)) return goHere(r, c, 'A'); }
   else { for (let c = 0; c < N; c++) if (white(r, c)) return goHere(r, c, 'A'); }
 }
-function onSpace() { if (white(sel.r, sel.c + 1)) gotoCell(sel.r, sel.c + 1, 'A'); else nextWordStart('A'); }
+function onSpace() {   // on to the next cell along the word being typed (a phrase answer is typed with its spaces, across or down)
+  const [dr, dc] = dvec();
+  if (white(sel.r + dr, sel.c + dc)) gotoCell(sel.r + dr, sel.c + dc, sel.dir); else nextWordStart('A');
+}
 function onEnter() { if (white(sel.r + 1, sel.c)) gotoCell(sel.r + 1, sel.c, 'D'); else nextWordStart('D'); }
 function onKey(e) {
   const el = e.target; if (mode === 'solve') lastActive = Date.now();
